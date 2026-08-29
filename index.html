@@ -297,9 +297,10 @@ function evalHand(cards){
 
 function bestHand(hole, board){
   const all = hole.concat(board);
+  const n = all.length;
+  if(n < 5) return evalHand(all.concat(Array(5-n).fill({r:'2',s:'♠',v:2})));
   let best = null;
   // 7 choose 5 = 21 combos
-  const n = all.length;
   for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)for(let e=d+1;e<n;e++){
     const ev = evalHand([all[a],all[b],all[c],all[d],all[e]]);
     if(!best || ev.rank>best.rank || (ev.rank===best.rank && compareTie(ev.tie,best.tie)>0)) best = ev;
@@ -360,8 +361,7 @@ function showdown(){
 // --- Bot ---
 function botDecision(idx){
   const toCall = currentBet - roundBets[idx];
-  const handStr = bestHand(players[idx].hand, community);
-  let strength = handStr.rank / 8;
+  let strength = 0.3;
   // simple preflop
   if(community.length===0){
     const v0 = players[idx].hand[0].v, v1 = players[idx].hand[1].v;
@@ -369,6 +369,9 @@ function botDecision(idx){
     const suited = players[idx].hand[0].s === players[idx].hand[1].s;
     const high = Math.max(v0,v1);
     strength = (paired?0.3:0) + high/28 + (suited?0.08:0);
+  } else {
+    const handStr = bestHand(players[idx].hand, community);
+    strength = handStr.rank / 8;
   }
   const r = Math.random();
   if(toCall===0){
