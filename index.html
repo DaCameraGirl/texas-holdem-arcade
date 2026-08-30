@@ -218,7 +218,9 @@ function showWinnerBanner(winners, handName){
   showdownHandName = handName || '';
   const el = document.getElementById('winner-banner');
   const names = winners.map(i=>players[i].name).join(' & ');
-  el.innerHTML = `🏆 ${names} wins! <small>${handName||''}</small><small style="color:#ffcc66">Click Next Hand</small>`;
+  const isYou = winners.includes(0);
+  const verb = (winners.length > 1 || isYou) ? 'WIN' : 'WINS';
+  el.innerHTML = `🏆 ${names} ${verb}! <small>${handName||''}</small><small style="color:#ffcc66">Click Next Hand</small>`;
   el.style.display = 'block';
   draw();
 }
