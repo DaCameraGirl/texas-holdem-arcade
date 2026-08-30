@@ -78,17 +78,50 @@
     min-height:16px;
   }
   #hand-rank {
-    font-size:8px;
-    color:#7fff7f;
+    font-size:11px;
+    font-weight:bold;
+    min-height:18px;
+    text-shadow: 0 0 8px currentColor;
   }
+  #hand-rank.rank-0 { color:#aaa; }
+  #hand-rank.rank-1 { color:#7fff7f; }
+  #hand-rank.rank-2 { color:#7fff7f; }
+  #hand-rank.rank-3 { color:#7fff7f; }
+  #hand-rank.rank-4 { color:#66ccff; }
+  #hand-rank.rank-5 { color:#66ccff; }
+  #hand-rank.rank-6 { color:#cc88ff; }
+  #hand-rank.rank-7 { color:#ffaa44; }
+  #hand-rank.rank-8 { color:#ffd700; text-shadow: 0 0 12px #ffd700; animation: pulse-gold 0.8s infinite alternate; }
+  @keyframes pulse-gold { from { opacity:0.85; } to { opacity:1; } }
   #slider-wrap { display:flex; align-items:center; gap:6px; }
   input[type=range] { width:120px; accent-color:#d4af37; }
+
+  /* winner banner */
+  #winner-banner {
+    position:absolute;
+    left:50%; top:44%;
+    transform:translate(-50%,-50%);
+    background:rgba(10,10,10,0.92);
+    border:3px solid #d4af37;
+    border-radius:12px;
+    padding:18px 28px;
+    text-align:center;
+    font-size:12px;
+    color:#fffacd;
+    box-shadow:0 0 30px rgba(212,175,55,0.5);
+    display:none;
+    pointer-events:none;
+    z-index:5;
+    line-height:1.9;
+  }
+  #winner-banner small { font-size:8px; color:#7fff7f; display:block; margin-top:4px;}
 </style>
 </head>
 <body>
 <div id="game-wrap">
   <div id="canvas-holder">
     <canvas id="table" width="960" height="540"></canvas>
+    <div id="winner-banner"></div>
   </div>
   <div id="ui-bar">
     <div>
@@ -104,7 +137,7 @@
         <input type="range" id="bet-slider" min="10" max="500" value="20" step="10">
         <input type="number" id="bet-input" value="20" min="10" step="10">
       </div>
-      <button id="btn-next">Deal</button>
+      <button id="btn-next">Next Hand</button>
     </div>
   </div>
   <div id="ui-bar" style="font-size:8px; justify-content:center;">
@@ -116,8 +149,8 @@
 
 <script>
 const SUITS = ['♠','♥','♦','♣'];
-const RANKS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
-const RANK_VAL = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'T':10,'J':11,'Q':12,'K':13,'A':14 };
+const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+const RANK_VAL = { '2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14 };
 
 const canvas = document.getElementById('table');
 const ctx = canvas.getContext('2d');
@@ -135,6 +168,80 @@ let roundBets = [];
 let folded = [];
 let allIn = [];
 
+// --- Turn timer ---
+const TURN_SECONDS = 10;
+let turnTimeLeft = TURN_SECONDS;
+let turnDeadline = 0;
+let turnTimerRaf = null;
+
+function startTurnTimer(){
+  turnTimeLeft = TURN_SECONDS;
+  turnDeadline = performance.now() + TURN_SECONDS*1000;
+  if(turnTimerRaf) cancelAnimationFrame(turnTimerRaf);
+  const tick = () => {
+    turnTimeLeft = Math.max(0, (turnDeadline - performance.now())/1000);
+    draw();
+    if(turnTimeLeft <= 0){
+      turnTimerRaf = null;
+      handleTurnTimeout();
+      return;
+    }
+    turnTimerRaf = requestAnimationFrame(tick);
+  };
+  turnTimerRaf = requestAnimationFrame(tick);
+}
+function stopTurnTimer(){
+  if(turnTimerRaf) cancelAnimationFrame(turnTimerRaf);
+  turnTimerRaf = null;
+}
+function handleTurnTimeout(){
+  if(stage==='showdown' || stage==='waiting') return;
+  const idx = actingIdx;
+  if(folded[idx] || allIn[idx]) return;
+  const toCall = currentBet - roundBets[idx];
+  if(toCall === 0){
+    doCheck(idx);
+    setMessage(players[idx].name+' checks (timeout)');
+  } else {
+    if(doFold(idx)){ updateUI(); draw(); return; }
+    setMessage(players[idx].name+' folds (timeout)');
+  }
+  updateUI(); draw();
+  advanceAction();
+}
+
+// --- Winner banner ---
+let showdownWinners = [];
+let showdownHandName = '';
+function showWinnerBanner(winners, handName){
+  showdownWinners = winners;
+  showdownHandName = handName || '';
+  const el = document.getElementById('winner-banner');
+  const names = winners.map(i=>players[i].name).join(' & ');
+  el.innerHTML = `🏆 ${names} wins! <small>${handName||''}</small><small style="color:#ffcc66">Click Next Hand</small>`;
+  el.style.display = 'block';
+  draw();
+}
+function hideWinnerBanner(){
+  showdownWinners = [];
+  showdownHandName = '';
+  document.getElementById('winner-banner').style.display = 'none';
+}
+
+// pop-up when you make a strong hand
+function flashHandMade(name){
+  const el = document.getElementById('winner-banner');
+  el.innerHTML = `✨ ${name.toUpperCase()}! ✨`;
+  el.style.display = 'block';
+  el.style.color = '#ffd700';
+  setTimeout(()=>{
+    if(stage !== 'showdown'){
+      el.style.display = 'none';
+      el.style.color = '';
+    }
+  }, 1400);
+}
+
 function newDeck() {
   const d = [];
   for(const s of SUITS) for(const r of RANKS) d.push({r, s, v: RANK_VAL[r]});
@@ -150,10 +257,16 @@ function initGame() {
     {name:'BOT-3', chips:1000, hand:[]},
   ];
   dealerIdx = Math.floor(Math.random()*players.length);
-  startHand();
+  stage='waiting';
+  setMessage('Click Next Hand to start');
+  updateUI();
+  draw();
 }
 
 function startHand() {
+  hideWinnerBanner();
+  const hr = document.getElementById('hand-rank');
+  if(hr){ hr.dataset.prevRank = -1; hr.className=''; }
   deck = newDeck();
   community = [];
   pot = 0;
@@ -177,6 +290,7 @@ function startHand() {
   setMessage('Pre-flop betting');
   updateUI();
   draw();
+  startTurnTimer();
   botTurnIfNeeded();
 }
 
@@ -199,6 +313,7 @@ function bettingDone(){
 }
 
 function nextStage(){
+  stopTurnTimer();
   roundBets = players.map(_=>0);
   currentBet = 0;
   actingIdx = nextActive((dealerIdx+1)%players.length);
@@ -215,6 +330,7 @@ function nextStage(){
     showdown(); return;
   }
   updateUI(); draw();
+  startTurnTimer();
   botTurnIfNeeded();
 }
 
@@ -227,6 +343,7 @@ function nextActive(start){
 }
 
 function advanceAction(){
+  stopTurnTimer();
   do{
     actingIdx = (actingIdx+1)%players.length;
   } while((folded[actingIdx]||allIn[actingIdx]) && activePlayers().length>1 && !bettingDone());
@@ -242,13 +359,12 @@ function advanceAction(){
     nextStage(); return;
   }
   updateUI(); draw();
+  startTurnTimer();
   botTurnIfNeeded();
 }
 
 // --- Hand evaluation ---
 function evalHand(cards){
-  // cards: array of {r,s,v}
-  // returns {rank: 0..8, tiebreak: [...], name}
   const vals = cards.map(c=>c.v).sort((a,b)=>b-a);
   const suits = {};
   const counts = {};
@@ -259,7 +375,6 @@ function evalHand(cards){
   const flushSuit = Object.keys(suits).find(s=>suits[s].length>=5);
   const flushVals = flushSuit ? suits[flushSuit].sort((a,b)=>b-a) : [];
   
-  // straight helper
   function findStraight(arr){
     const uniq = [...new Set(arr)].sort((a,b)=>b-a);
     const extended = uniq.includes(14) ? uniq.concat([1]) : uniq;
@@ -300,7 +415,6 @@ function bestHand(hole, board){
   const n = all.length;
   if(n < 5) return evalHand(all.concat(Array(5-n).fill({r:'2',s:'♠',v:2})));
   let best = null;
-  // 7 choose 5 = 21 combos
   for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)for(let e=d+1;e<n;e++){
     const ev = evalHand([all[a],all[b],all[c],all[d],all[e]]);
     if(!best || ev.rank>best.rank || (ev.rank===best.rank && compareTie(ev.tie,best.tie)>0)) best = ev;
@@ -314,7 +428,7 @@ function doFold(idx){
   folded[idx]=true;
   setMessage(players[idx].name+' folds');
   const remain = activePlayers();
-  if(remain.length===1){ awardPot(remain); return true; }
+  if(remain.length===1){ awardPot(remain, 'Everyone else folded'); return true; }
   return false;
 }
 function doCheck(idx){
@@ -340,12 +454,14 @@ function doRaise(idx, total){
   setMessage(players[idx].name+' raises to '+roundBets[idx]);
 }
 
-function awardPot(winners){
+function awardPot(winners, handName=''){
+  stopTurnTimer();
   for(const w of winners) players[w].chips += Math.floor(pot / winners.length);
   setMessage((winners.length>1?'Split pot: ':'Winner: ')+winners.map(i=>players[i].name).join(', '));
   stage='showdown';
   updateUI(); draw();
-  setTimeout(()=>{ dealerIdx = (dealerIdx+1)%players.length; startHand(); }, 2500);
+  showWinnerBanner(winners, handName);
+  // no auto-deal, wait for Next Hand button
 }
 
 function showdown(){
@@ -355,14 +471,13 @@ function showdown(){
   hands.sort((a,b)=> b.ev.rank - a.ev.rank || compareTie(b.ev.tie, a.ev.tie));
   const top = hands[0];
   const winners = hands.filter(h=> h.ev.rank===top.ev.rank && compareTie(h.ev.tie, top.ev.tie)===0).map(h=>h.i);
-  awardPot(winners);
+  awardPot(winners, top.ev.name);
 }
 
 // --- Bot ---
 function botDecision(idx){
   const toCall = currentBet - roundBets[idx];
   let strength = 0.3;
-  // simple preflop
   if(community.length===0){
     const v0 = players[idx].hand[0].v, v1 = players[idx].hand[1].v;
     const paired = v0===v1;
@@ -427,33 +542,69 @@ btnBet.onclick = ()=>{
   doRaise(actingIdx, amt);
   updateUI(); draw(); advanceAction();
 };
-btnNext.onclick = ()=> { if(stage==='waiting') startHand(); };
+btnNext.onclick = ()=> { 
+  if(stage==='showdown' || stage==='waiting') {
+    dealerIdx = (dealerIdx+1)%players.length;
+    startHand();
+  }
+};
 
 function updateUI(){
   const you = players[0];
   const toCall = currentBet - roundBets[0];
   btnCall.textContent = toCall>0 ? `Call ${toCall}` : 'Call 0';
-  btnCall.disabled = !humanCanAct() || toCall<=0;
-  btnCheck.disabled = !humanCanAct() || toCall>0;
-  btnFold.disabled = !humanCanAct();
-  btnBet.disabled = !humanCanAct();
+  const canAct = humanCanAct();
+  btnCall.disabled = !canAct || toCall<=0;
+  btnCheck.disabled = !canAct || toCall>0;
+  btnFold.disabled = !canAct;
+  btnBet.disabled = !canAct;
 
   document.getElementById('pot').textContent = pot;
-  document.getElementById('player-chips').textContent = you.chips;
-  const maxBet = you.chips + roundBets[0];
+  document.getElementById('player-chips').textContent = you?.chips ?? 1000;
+  const maxBet = (you?.chips||0) + roundBets[0];
   betSlider.max = maxBet;
   betSlider.min = Math.min(currentBet+10, maxBet);
   betInput.min = betSlider.min;
   betInput.max = maxBet;
   const hr = document.getElementById('hand-rank');
-  if(you.hand.length===2){
+  if(you?.hand.length===2){
     const ev = bestHand(you.hand, community);
-    hr.textContent = community.length ? ev.name : '';
-  } else { hr.textContent=''; }
-  btnNext.style.display = stage==='waiting' ? '' : 'none';
+    let label = ev.name.toUpperCase();
+    // preflop hole-card hints so it's never blank
+    if(community.length === 0){
+      const c0 = you.hand[0], c1 = you.hand[1];
+      if(c0.v === c1.v) label = `POCKET ${c0.r}s`;
+      else {
+        const suited = c0.s === c1.s ? 's' : 'o';
+        const high = c0.v > c1.v ? c0.r + c1.r : c1.r + c0.r;
+        label = `${high}${suited} — ${ev.name.toUpperCase()}`;
+      }
+    }
+    hr.textContent = label;
+    hr.className = '';
+    hr.classList.add('rank-' + ev.rank);
+    // big pop-up when you improve to a strong hand
+    const prevRank = +hr.dataset.prevRank || -1;
+    if(community.length > 0 && ev.rank >= 4 && ev.rank > prevRank){
+      flashHandMade(ev.name);
+    }
+    hr.dataset.prevRank = ev.rank;
+  } else { hr.textContent=''; hr.className=''; }
+  btnNext.style.display = (stage==='showdown' || stage==='waiting') ? '' : 'none';
+  btnNext.textContent = stage==='waiting' ? 'Deal' : 'Next Hand';
 }
 
 // --- Rendering ---
+function getSeatCoords(){
+  const cx = canvas.width/2;
+  return [
+    {x:cx, y:470, p:0},
+    {x:140, y:240, p:1},
+    {x:cx, y:110, p:2},
+    {x:820, y:240, p:3},
+  ];
+}
+
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   // felt
@@ -474,18 +625,53 @@ function draw(){
   ctx.textAlign = 'center';
   ctx.fillText('POT $'+pot, cx, cy+70);
 
-  // player seats: bottom (you), top, left, right
-  const seats = [
-    {x:cx, y:470, p:0, faceUp:true},
-    {x:cx, y:80, p:2, faceUp: stage==='showdown'},
-    {x:140, y:240, p:1, faceUp: stage==='showdown'},
-    {x:820, y:240, p:3, faceUp: stage==='showdown'},
-  ];
+  const seats = getSeatCoords().map(s => ({...s, faceUp: s.p===0 || stage==='showdown'}));
+
   for(const seat of seats){
     const pl = players[seat.p];
     if(!pl) continue;
-    const isActing = actingIdx===seat.p && stage!=='showdown';
-    ctx.fillStyle = isActing ? '#fffacd' : '#e8e8e8';
+    const isActing = actingIdx===seat.p && stage!=='showdown' && stage!=='waiting';
+    const isWinner = showdownWinners.includes(seat.p);
+
+    // winner glow
+    if(isWinner){
+      ctx.save();
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 25;
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '10px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText('★ WINNER ★', seat.x, seat.y - 98);
+      ctx.restore();
+    }
+
+    // --- turn timer ring over head ---
+    if(isActing){
+      const frac = Math.max(0, turnTimeLeft / TURN_SECONDS);
+      const secs = Math.ceil(turnTimeLeft);
+      const tx = seat.x, ty = seat.y - 78;
+      ctx.save();
+      // background ring
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath();
+      ctx.arc(tx, ty, 18, 0, Math.PI*2);
+      ctx.stroke();
+      // progress ring
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = frac < 0.33 ? '#ff4444' : frac < 0.6 ? '#ffcc66' : '#7fff7f';
+      ctx.beginPath();
+      ctx.arc(tx, ty, 18, -Math.PI/2, -Math.PI/2 + frac * Math.PI*2);
+      ctx.stroke();
+      ctx.restore();
+      // seconds
+      ctx.fillStyle = frac < 0.33 ? '#ff6666' : '#fffacd';
+      ctx.font = '10px "Press Start 2P"';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(secs), tx, ty + 4);
+    }
+
+    ctx.fillStyle = isWinner ? '#ffd700' : isActing ? '#fffacd' : '#e8e8e8';
     ctx.font = '10px "Press Start 2P"';
     ctx.textAlign = 'center';
     ctx.fillText(pl.name + (folded[seat.p]?'  (FOLD)':''), seat.x, seat.y-55);
@@ -499,6 +685,14 @@ function draw(){
     // hole cards
     drawCard(seat.x-35, seat.y-10, pl.hand[0], seat.faceUp);
     drawCard(seat.x+5, seat.y-10, pl.hand[1], seat.faceUp);
+
+    // show hand name at showdown
+    if(stage==='showdown' && !folded[seat.p]){
+      const ev = bestHand(pl.hand, community);
+      ctx.fillStyle = isWinner ? '#ffd700' : '#aaa';
+      ctx.font = '7px "Press Start 2P"';
+      ctx.fillText(ev.name, seat.x, seat.y + 82);
+    }
   }
 }
 
@@ -524,7 +718,7 @@ function drawCard(x,y,card,faceUp){
   if(card && faceUp){
     const red = card.s==='♥' || card.s==='♦';
     ctx.fillStyle = red ? '#d22' : '#111';
-    ctx.font = 'bold 18px Arial';
+    ctx.font = card.r === '10' ? 'bold 15px Arial' : 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.fillText(card.r, 28, 28);
     ctx.font = '20px Arial';
