@@ -190,10 +190,10 @@ const SFX = (() => {
     get on(){ return enabled; },
     set on(v){ enabled = !!v; localStorage.setItem('th_sfx', enabled?'1':'0'); const b=document.getElementById('btn-sfx'); if(b){ b.textContent = enabled?'🔊':'🔇'; b.classList.toggle('off', !enabled);} try{ if(!enabled && window.VOICE) VOICE.cancel(); }catch(e){} },
     init(){ resume(); },
-    deal(){ resume(); const z=t(); for(let i=0;i<8;i++) tone(620+i*18, z+i*0.045, 0.055, 'square', 0.13); try{ VOICE && VOICE.say("Cards in the air. Place your bets."); }catch(e){} },
-    flop(){ resume(); const z=t(); [523,659,784].forEach((f,i)=>tone(f, z+i*0.07, 0.11, 'triangle', 0.16)); try{ VOICE && VOICE.say("Here's the flop!"); }catch(e){} },
-    turn(){ resume(); tone(880, t(), 0.14, 'triangle', 0.16); try{ VOICE && VOICE.say("The turn."); }catch(e){} },
-    river(){ resume(); const z=t(); tone(659, z, 0.12, 'sawtooth', 0.14); tone(988, z+0.08, 0.16, 'triangle', 0.14); try{ VOICE && VOICE.say("And the river!"); }catch(e){} },
+    deal(){ resume(); const z=t(); for(let i=0;i<8;i++) tone(620+i*18, z+i*0.045, 0.055, 'square', 0.13); try{ setTimeout(()=> VOICE && VOICE.sayVariant("deal"), 350); }catch(e){} },
+    flop(){ resume(); const z=t(); [523,659,784].forEach((f,i)=>tone(f, z+i*0.07, 0.11, 'triangle', 0.16)); try{ setTimeout(()=> VOICE && VOICE.sayVariant("flop"), 380); }catch(e){} },
+    turn(){ resume(); tone(880, t(), 0.14, 'triangle', 0.16); try{ setTimeout(()=> VOICE && VOICE.sayVariant("turn"), 320); }catch(e){} },
+    river(){ resume(); const z=t(); tone(659, z, 0.12, 'sawtooth', 0.14); tone(988, z+0.08, 0.16, 'triangle', 0.14); try{ setTimeout(()=> VOICE && VOICE.sayVariant("river"), 320); }catch(e){} },
     chip(){ resume(); const z=t(); tone(520+Math.random()*80, z, 0.06, 'square', 0.14); tone(740, z+0.035, 0.05, 'square', 0.11); },
     check(){ resume(); tone(440, t(), 0.07, 'triangle', 0.13); },
     fold(){ resume(); const z=t(); noise(z,0.09,0.09); tone(300, z, 0.12, 'sawtooth', 0.1, -140); },
@@ -222,6 +222,33 @@ const VOICE = (() => {
   function ensure(){ if(_ready) return; _voice = pickVoice(); _ready = !!_voice; }
   speechSynthesis.onvoiceschanged = () => { _ready = false; ensure(); };
   ensure();
+  const lines = {
+    deal: [
+      "Cards in the air. Place your bets.",
+      "Here we go, good luck everybody.",
+      "Dealing. Action is on you.",
+      "New hand, place your bets."
+    ],
+    flop: [
+      "Here's the flop!",
+      "And the flop!",
+      "Three on the board, here's the flop.",
+      "Flop is out, your move."
+    ],
+    turn: [
+      "The turn.",
+      "Here's the turn card.",
+      "Turn card is out.",
+      "One more, the turn."
+    ],
+    river: [
+      "And the river!",
+      "River card!",
+      "Last card, the river.",
+      "Here's the river, make it count."
+    ]
+  };
+  const pick = a => a[Math.floor(Math.random()*a.length)];
   return {
     say(text){
       try{
@@ -230,10 +257,11 @@ const VOICE = (() => {
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         if(_voice) u.voice = _voice;
-        u.rate = 0.95; u.pitch = 0.9; u.volume = 1.0;
+        u.rate = 0.82; u.pitch = 0.9; u.volume = 1.0;
         speechSynthesis.speak(u);
       }catch(e){}
     },
+    sayVariant(kind){ this.say(pick(lines[kind] || [kind])); },
     cancel(){ try{ speechSynthesis.cancel(); }catch(e){} }
   };
 })();
@@ -250,6 +278,12 @@ let actingIdx = 0;
 let roundBets = [];
 let folded = [];
 let allIn = [];
+let acted = [];
+
+function resetStreetActions(){
+  acted = players.map(_=>false);
+}
+function markActed(i){ acted[i] = true; }
 
 // --- Turn timer ---
 const TURN_SECONDS = 10;
@@ -368,6 +402,7 @@ function startHand() {
   roundBets = players.map(_=>0);
   folded = players.map(_=>false);
   allIn = players.map(_=>false);
+  resetStreetActions();
   for(const p of players) p.hand = [];
 
   // deal 2 each
@@ -379,6 +414,8 @@ function startHand() {
   postBlind(sb, 5);
   postBlind(bb, 10);
   currentBet = 10;
+  // blinds count as acted preflop
+  markActed(sb); markActed(bb);
   actingIdx = (dealerIdx+3)%players.length;
   setMessage('Pre-flop betting');
   updateUI();
@@ -402,29 +439,39 @@ function activePlayers(){ return players.map((_,i)=>i).filter(i=>!folded[i]); }
 function bettingDone(){
   const act = activePlayers();
   if(act.length<=1) return true;
-  return act.every(i => allIn[i] || roundBets[i]===currentBet);
+  // everyone still in must have acted AND matched the current bet (or be all-in)
+  return act.every(i => (acted[i]||allIn[i]) && (allIn[i] || roundBets[i]===currentBet));
+}
+
+function startBettingRound(){
+  resetStreetActions();
+  // first to act is left of dealer, skip folded/all-in
+  actingIdx = nextActive((dealerIdx+1)%players.length);
+  updateUI(); draw();
+  startTurnTimer();
+  botTurnIfNeeded();
 }
 
 function nextStage(){
   stopTurnTimer();
   roundBets = players.map(_=>0);
   currentBet = 0;
-  actingIdx = nextActive((dealerIdx+1)%players.length);
+
   if(stage==='preflop'){
     community.push(deck.pop(),deck.pop(),deck.pop()); stage='flop';
-    setMessage('Flop'); SFX.flop();
+    setMessage('Flop'); draw(); SFX.flop();
   } else if(stage==='flop'){
     community.push(deck.pop()); stage='turn';
-    setMessage('Turn'); SFX.turn();
+    setMessage('Turn'); draw(); SFX.turn();
   } else if(stage==='turn'){
     community.push(deck.pop()); stage='river';
-    setMessage('River'); SFX.river();
+    setMessage('River'); draw(); SFX.river();
   } else if(stage==='river'){
     showdown(); return;
   }
-  updateUI(); draw();
-  startTurnTimer();
-  botTurnIfNeeded();
+  updateUI();
+  // give players a beat to see the cards before betting resumes
+  setTimeout(()=> startBettingRound(), 900);
 }
 
 function nextActive(start){
@@ -437,16 +484,21 @@ function nextActive(start){
 
 function advanceAction(){
   stopTurnTimer();
+  // move to next live player
   do{
     actingIdx = (actingIdx+1)%players.length;
-  } while((folded[actingIdx]||allIn[actingIdx]) && activePlayers().length>1 && !bettingDone());
+  } while((folded[actingIdx]||allIn[actingIdx]) && activePlayers().length>1);
   
   if(bettingDone()){
-    if(activePlayers().filter(i=>!allIn[i]).length<=1 || stage==='river'){
-      if(stage==='river') { showdown(); return; }
-      // run out board fast
-      while(stage!=='river' && activePlayers().length>1) nextStage();
-      if(activePlayers().length>1) nextStage();
+    const live = activePlayers().filter(i=>!allIn[i]);
+    if(live.length<=1 || stage==='river'){
+      if(stage==='river'){ showdown(); return; }
+      // run out remaining board with pauses so dealer can talk
+      const runOut = ()=>{
+        if(stage==='river'){ showdown(); return; }
+        nextStage();
+      };
+      setTimeout(runOut, 900);
       return;
     }
     nextStage(); return;
@@ -518,6 +570,7 @@ function compareTie(a,b){ for(let i=0;i<Math.max(a.length,b.length);i++){ const 
 
 // --- Actions ---
 function doFold(idx){
+  markActed(idx);
   SFX.fold();
   folded[idx]=true;
   setMessage(players[idx].name+' folds');
@@ -526,10 +579,12 @@ function doFold(idx){
   return false;
 }
 function doCheck(idx){
+  markActed(idx);
   SFX.check();
   setMessage(players[idx].name+' checks');
 }
 function doCall(idx){
+  markActed(idx);
   SFX.chip();
   const toCall = currentBet - roundBets[idx];
   const pay = Math.min(toCall, players[idx].chips);
@@ -549,6 +604,9 @@ function doRaise(idx, total){
   currentBet = Math.max(currentBet, roundBets[idx]);
   if(players[idx].chips===0) allIn[idx]=true;
   setMessage(players[idx].name+' raises to '+roundBets[idx]);
+  // raise reopens action – everyone else needs to act again
+  for(let i=0;i<players.length;i++) if(i!==idx && !folded[i] && !allIn[i]) acted[i]=false;
+  markActed(idx);
 }
 
 function awardPot(winners, handName=''){
@@ -601,6 +659,7 @@ function botTurnIfNeeded(){
   if(stage==='showdown' || stage==='waiting') return;
   const p = players[actingIdx];
   if(p.isHuman){ SFX.yourTurn(); return; }
+  const delay = 1200 + Math.random()*800;
   setTimeout(()=>{
     if(folded[actingIdx]||allIn[actingIdx]) { advanceAction(); return; }
     const dec = botDecision(actingIdx);
@@ -610,7 +669,7 @@ function botTurnIfNeeded(){
     else if(dec.act==='raise') doRaise(actingIdx, dec.amt);
     updateUI(); draw();
     advanceAction();
-  }, 650);
+  }, delay);
 }
 
 // --- UI wiring ---
