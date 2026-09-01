@@ -190,10 +190,10 @@ const SFX = (() => {
     get on(){ return enabled; },
     set on(v){ enabled = !!v; localStorage.setItem('th_sfx', enabled?'1':'0'); const b=document.getElementById('btn-sfx'); if(b){ b.textContent = enabled?'🔊':'🔇'; b.classList.toggle('off', !enabled);} try{ if(!enabled && window.VOICE) VOICE.cancel(); }catch(e){} },
     init(){ resume(); },
-    deal(){ resume(); const z=t(); for(let i=0;i<8;i++) tone(620+i*18, z+i*0.045, 0.055, 'square', 0.13); try{ setTimeout(()=> VOICE && VOICE.sayVariant("deal"), 350); }catch(e){} },
-    flop(){ resume(); const z=t(); [523,659,784].forEach((f,i)=>tone(f, z+i*0.07, 0.11, 'triangle', 0.16)); try{ setTimeout(()=> VOICE && VOICE.sayVariant("flop"), 380); }catch(e){} },
-    turn(){ resume(); tone(880, t(), 0.14, 'triangle', 0.16); try{ setTimeout(()=> VOICE && VOICE.sayVariant("turn"), 320); }catch(e){} },
-    river(){ resume(); const z=t(); tone(659, z, 0.12, 'sawtooth', 0.14); tone(988, z+0.08, 0.16, 'triangle', 0.14); try{ setTimeout(()=> VOICE && VOICE.sayVariant("river"), 320); }catch(e){} },
+    deal(){ resume(); const z=t(); for(let i=0;i<8;i++) tone(620+i*18, z+i*0.045, 0.055, 'square', 0.13); try{ setTimeout(()=> VOICE && VOICE.sayVariant("deal"), 600); }catch(e){} },
+    flop(){ resume(); const z=t(); [523,659,784].forEach((f,i)=>tone(f, z+i*0.07, 0.11, 'triangle', 0.16)); try{ setTimeout(()=> VOICE && VOICE.sayVariant("flop"), 600); }catch(e){} },
+    turn(){ resume(); tone(880, t(), 0.14, 'triangle', 0.16); try{ setTimeout(()=> VOICE && VOICE.sayVariant("turn"), 600); }catch(e){} },
+    river(){ resume(); const z=t(); tone(659, z, 0.12, 'sawtooth', 0.14); tone(988, z+0.08, 0.16, 'triangle', 0.14); try{ setTimeout(()=> VOICE && VOICE.sayVariant("river"), 600); }catch(e){} },
     chip(){ resume(); const z=t(); tone(520+Math.random()*80, z, 0.06, 'square', 0.14); tone(740, z+0.035, 0.05, 'square', 0.11); },
     check(){ resume(); tone(440, t(), 0.07, 'triangle', 0.13); },
     fold(){ resume(); const z=t(); noise(z,0.09,0.09); tone(300, z, 0.12, 'sawtooth', 0.1, -140); },
@@ -257,16 +257,12 @@ const VOICE = (() => {
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         if(_voice) u.voice = _voice;
-        u.rate = opts.rate ?? 1.05; u.pitch = opts.pitch ?? 1.15; u.volume = 1.0;
+        u.rate = opts.rate ?? 1.25; u.pitch = opts.pitch ?? 1.35; u.volume = 1.0;
         speechSynthesis.speak(u);
       }catch(e){}
     },
     sayVariant(kind){
-      const energy = { deal: {rate:1.0, pitch:1.1}, flop: {rate:1.05, pitch:1.15}, turn: {rate:1.1, pitch:1.2}, river: {rate:1.15, pitch:1.25} };
-      this.say(pick(lines[kind] || [kind]), energy[kind] || {});
-    },
-    sayVariant(kind){
-      const energy = { deal: {rate:1.0, pitch:1.1}, flop: {rate:1.05, pitch:1.15}, turn: {rate:1.1, pitch:1.2}, river: {rate:1.15, pitch:1.25} };
+      const energy = { deal: {rate:1.2, pitch:1.3}, flop: {rate:1.25, pitch:1.35}, turn: {rate:1.3, pitch:1.4}, river: {rate:1.35, pitch:1.45} };
       this.say(pick(lines[kind] || [kind]), energy[kind] || {});
     },
     cancel(){ try{ speechSynthesis.cancel(); }catch(e){} }
@@ -293,7 +289,7 @@ function resetStreetActions(){
 function markActed(i){ acted[i] = true; }
 
 // --- Turn timer ---
-const TURN_SECONDS = 10;
+const TURN_SECONDS = 15;
 let turnTimeLeft = TURN_SECONDS;
 let turnDeadline = 0;
 let turnTimerRaf = null;
@@ -397,6 +393,7 @@ function initGame() {
 }
 
 function startHand() {
+  try{ VOICE.cancel(); }catch(e){}
   SFX.deal();
   hideWinnerBanner();
   const hr = document.getElementById('hand-rank');
@@ -461,6 +458,7 @@ function startBettingRound(){
 
 function nextStage(){
   stopTurnTimer();
+  try{ VOICE.cancel(); }catch(e){}
   roundBets = players.map(_=>0);
   currentBet = 0;
 
@@ -478,7 +476,7 @@ function nextStage(){
   }
   updateUI();
   // give players a beat to see the cards before betting resumes
-  setTimeout(()=> startBettingRound(), 900);
+  setTimeout(()=> startBettingRound(), 1800);
 }
 
 function nextActive(start){
@@ -505,7 +503,7 @@ function advanceAction(){
         if(stage==='river'){ showdown(); return; }
         nextStage();
       };
-      setTimeout(runOut, 900);
+      setTimeout(runOut, 1500);
       return;
     }
     nextStage(); return;
@@ -666,7 +664,7 @@ function botTurnIfNeeded(){
   if(stage==='showdown' || stage==='waiting') return;
   const p = players[actingIdx];
   if(p.isHuman){ SFX.yourTurn(); return; }
-  const delay = 1200 + Math.random()*800;
+  const delay = 1500 + Math.random()*1000;
   setTimeout(()=>{
     if(folded[actingIdx]||allIn[actingIdx]) { advanceAction(); return; }
     const dec = botDecision(actingIdx);
