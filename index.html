@@ -250,18 +250,25 @@ const VOICE = (() => {
   };
   const pick = a => a[Math.floor(Math.random()*a.length)];
   return {
-    say(text){
+    say(text, opts={}){
       try{
         if(!SFX.on) return;
         ensure();
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
         if(_voice) u.voice = _voice;
-        u.rate = 0.82; u.pitch = 0.9; u.volume = 1.0;
+        u.rate = opts.rate ?? 1.05; u.pitch = opts.pitch ?? 1.15; u.volume = 1.0;
         speechSynthesis.speak(u);
       }catch(e){}
     },
-    sayVariant(kind){ this.say(pick(lines[kind] || [kind])); },
+    sayVariant(kind){
+      const energy = { deal: {rate:1.0, pitch:1.1}, flop: {rate:1.05, pitch:1.15}, turn: {rate:1.1, pitch:1.2}, river: {rate:1.15, pitch:1.25} };
+      this.say(pick(lines[kind] || [kind]), energy[kind] || {});
+    },
+    sayVariant(kind){
+      const energy = { deal: {rate:1.0, pitch:1.1}, flop: {rate:1.05, pitch:1.15}, turn: {rate:1.1, pitch:1.2}, river: {rate:1.15, pitch:1.25} };
+      this.say(pick(lines[kind] || [kind]), energy[kind] || {});
+    },
     cancel(){ try{ speechSynthesis.cancel(); }catch(e){} }
   };
 })();
