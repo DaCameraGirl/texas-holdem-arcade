@@ -341,10 +341,12 @@ function handleTurnTimeout(){
 let showdownWinners = [];
 let showdownHandName = '';
 function showWinnerBanner(winners, handName){
+  // force numeric, unique
+  winners = [...new Set(winners.map(n=>+n))];
   showdownWinners = winners;
   showdownHandName = handName || '';
   const el = document.getElementById('winner-banner');
-  const names = winners.map(i=>players[i].name).join(' & ');
+  const names = winners.map(i=>players[i]?.name || 'P'+i).join(' & ');
   const isYou = winners.includes(0);
   const verb = (winners.length > 1 || isYou) ? 'WIN' : 'WINS';
   el.innerHTML = `🏆 ${names} ${verb}! <small>${handName||''}</small><small style="color:#ffcc66">Click Next Hand</small>`;
@@ -572,6 +574,8 @@ function bestHand(hole, board){
   return best;
 }
 function compareTie(a,b){ for(let i=0;i<Math.max(a.length,b.length);i++){ const av=a[i]||0, bv=b[i]||0; if(av!==bv) return av-bv; } return 0; }
+// returns -1/0/1 for sort stability
+function compareHandsDesc(A,B){ if(A.ev.rank!==B.ev.rank) return B.ev.rank - A.ev.rank; return compareTie(B.ev.tie, A.ev.tie); }
 
 // --- Actions ---
 function doFold(idx){
@@ -616,6 +620,10 @@ function doRaise(idx, total){
 
 function awardPot(winners, handName=''){
   stopTurnTimer();
+  // sanitize winner list – must be active, unique, numeric
+  const activeSet = new Set(activePlayers());
+  winners = [...new Set(winners.map(n=>+n).filter(n=> Number.isInteger(n) && activeSet.has(n)))];
+  if(!winners.length) { console.error('awardPot: empty winners, aborting'); return; }
   for(const w of winners) players[w].chips += Math.floor(pot / winners.length);
   setMessage((winners.length>1?'Split pot: ':'Winner: ')+winners.map(i=>players[i].name).join(', '));
   stage='showdown';
@@ -629,9 +637,10 @@ function showdown(){
   stage='showdown';
   const remain = activePlayers();
   const hands = remain.map(i=> ({i, ev: bestHand(players[i].hand, community)}));
-  hands.sort((a,b)=> b.ev.rank - a.ev.rank || compareTie(b.ev.tie, a.ev.tie));
+  hands.sort(compareHandsDesc);
   const top = hands[0];
   const winners = hands.filter(h=> h.ev.rank===top.ev.rank && compareTie(h.ev.tie, top.ev.tie)===0).map(h=>h.i);
+  console.log('[showdown]', hands.map(h=>({player:players[h.i].name, i:h.i, rank:h.ev.name, tie:h.ev.tie})), 'winners:', winners.map(i=>players[i].name));
   awardPot(winners, top.ev.name);
 }
 
@@ -799,7 +808,7 @@ function draw(){
     const pl = players[seat.p];
     if(!pl) continue;
     const isActing = actingIdx===seat.p && stage!=='showdown' && stage!=='waiting';
-    const isWinner = showdownWinners.includes(seat.p);
+    const isWinner = Array.isArray(showdownWinners) && showdownWinners.map(n=>+n).includes(+seat.p);
 
     // winner glow
     if(isWinner){
