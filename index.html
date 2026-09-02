@@ -190,16 +190,16 @@ const SFX = (() => {
     get on(){ return enabled; },
     set on(v){ enabled = !!v; localStorage.setItem('th_sfx', enabled?'1':'0'); const b=document.getElementById('btn-sfx'); if(b){ b.textContent = enabled?'🔊':'🔇'; b.classList.toggle('off', !enabled);} try{ if(!enabled && window.VOICE) VOICE.cancel(); }catch(e){} },
     init(){ resume(); },
-    deal(){ resume(); const z=t(); for(let i=0;i<8;i++) tone(620+i*18, z+i*0.045, 0.055, 'square', 0.13); try{ setTimeout(()=> VOICE && VOICE.sayVariant("deal"), 600); }catch(e){} },
-    flop(){ resume(); const z=t(); [523,659,784].forEach((f,i)=>tone(f, z+i*0.07, 0.11, 'triangle', 0.16)); try{ setTimeout(()=> VOICE && VOICE.sayVariant("flop"), 600); }catch(e){} },
-    turn(){ resume(); tone(880, t(), 0.14, 'triangle', 0.16); try{ setTimeout(()=> VOICE && VOICE.sayVariant("turn"), 600); }catch(e){} },
-    river(){ resume(); const z=t(); tone(659, z, 0.12, 'sawtooth', 0.14); tone(988, z+0.08, 0.16, 'triangle', 0.14); try{ setTimeout(()=> VOICE && VOICE.sayVariant("river"), 600); }catch(e){} },
+    deal(){ resume(); const z=t(); for(let i=0;i<8;i++) tone(620+i*18, z+i*0.045, 0.055, 'square', 0.13); try{ VOICE && VOICE.queue("deal", 600); }catch(e){} },
+    flop(){ resume(); const z=t(); [523,659,784].forEach((f,i)=>tone(f, z+i*0.07, 0.11, 'triangle', 0.16)); try{ VOICE && VOICE.queue("flop", 600); }catch(e){} },
+    turn(){ resume(); tone(880, t(), 0.14, 'triangle', 0.16); try{ VOICE && VOICE.queue("turn", 600); }catch(e){} },
+    river(){ resume(); const z=t(); tone(659, z, 0.12, 'sawtooth', 0.14); tone(988, z+0.08, 0.16, 'triangle', 0.14); try{ VOICE && VOICE.queue("river", 600); }catch(e){} },
     chip(){ resume(); const z=t(); tone(520+Math.random()*80, z, 0.06, 'square', 0.14); tone(740, z+0.035, 0.05, 'square', 0.11); },
     check(){ resume(); tone(440, t(), 0.07, 'triangle', 0.13); },
     fold(){ resume(); const z=t(); noise(z,0.09,0.09); tone(300, z, 0.12, 'sawtooth', 0.1, -140); },
     yourTurn(){ resume(); const z=t(); tone(784, z, 0.09, 'square', 0.15); tone(1046, z+0.09, 0.11, 'square', 0.15); },
     tick(urgent){ resume(); tone(urgent?1320:880, t(), 0.045, 'square', urgent?0.16:0.1); },
-    win(handName){ resume(); const z=t(), seq=[523,659,784,1046]; seq.forEach((f,i)=>tone(f, z+i*0.09, 0.13, 'square', 0.17)); try{ if(handName && VOICE) VOICE.say(handName + " wins!"); }catch(e){} },
+    win(names, handName){ resume(); const z=t(), seq=[523,659,784,1046]; seq.forEach((f,i)=>tone(f, z+i*0.09, 0.13, 'square', 0.17)); try{ if(VOICE){ const txt = names ? (names + " wins with " + (handName||"" ) + "!") : (handName ? handName + " wins!" : "We have a winner!"); VOICE.say(txt, {rate:1.3, pitch:1.4}); } }catch(e){} },
     lose(){ resume(); const z=t(); [392,330,262].forEach((f,i)=>tone(f, z+i*0.12, 0.14, 'triangle', 0.13)); },
   };
 })();
@@ -208,6 +208,7 @@ const SFX = (() => {
 const VOICE = (() => {
   let _voice = null;
   let _ready = false;
+  let pendingVoice = null;
   function pickVoice(){
     const vs = speechSynthesis.getVoices();
     if(!vs.length) return null;
@@ -222,36 +223,38 @@ const VOICE = (() => {
   function ensure(){ if(_ready) return; _voice = pickVoice(); _ready = !!_voice; }
   speechSynthesis.onvoiceschanged = () => { _ready = false; ensure(); };
   ensure();
+  function clearPending(){ if(pendingVoice){ clearTimeout(pendingVoice); pendingVoice=null; } }
   const lines = {
     deal: [
-      "Cards in the air. Place your bets.",
-      "Here we go, good luck everybody.",
-      "Dealing. Action is on you.",
-      "New hand, place your bets."
+      "Cards in the air, good luck everybody!",
+      "New hand – place your bets!",
+      "Here we go, action is on you!",
+      "Dealing! Let's play poker!"
     ],
     flop: [
-      "Here's the flop!",
-      "And the flop!",
-      "Three on the board, here's the flop.",
-      "Flop is out, your move."
+      "Flop is out – let's see some action!",
+      "Here comes the flop!",
+      "Three on the board, flop is live!",
+      "Boom! Here's the flop!"
     ],
     turn: [
-      "The turn.",
-      "Here's the turn card.",
-      "Turn card is out.",
-      "One more, the turn."
+      "Turn card – make it count!",
+      "And the turn!",
+      "Turn is out, big decisions!",
+      "One card left after this!"
     ],
     river: [
-      "And the river!",
-      "River card!",
-      "Last card, the river.",
-      "Here's the river, make it count."
+      "RIVER! Show me what you got!",
+      "Last card – river!",
+      "River card is out!",
+      "Final card, make it count!"
     ]
   };
   const pick = a => a[Math.floor(Math.random()*a.length)];
   return {
     say(text, opts={}){
       try{
+        clearPending();
         if(!SFX.on) return;
         ensure();
         speechSynthesis.cancel();
@@ -265,7 +268,11 @@ const VOICE = (() => {
       const energy = { deal: {rate:1.2, pitch:1.3}, flop: {rate:1.25, pitch:1.35}, turn: {rate:1.3, pitch:1.4}, river: {rate:1.35, pitch:1.45} };
       this.say(pick(lines[kind] || [kind]), energy[kind] || {});
     },
-    cancel(){ try{ speechSynthesis.cancel(); }catch(e){} }
+    queue(kind, delay=600){
+      clearPending();
+      pendingVoice = setTimeout(()=>{ pendingVoice=null; this.sayVariant(kind); }, delay);
+    },
+    cancel(){ clearPending(); try{ speechSynthesis.cancel(); }catch(e){} }
   };
 })();
 
@@ -629,7 +636,8 @@ function awardPot(winners, handName=''){
   stage='showdown';
   updateUI(); draw();
   showWinnerBanner(winners, handName);
-  if(winners.includes(0)) SFX.win(handName); else SFX.lose();
+  const winnerNames = winners.map(i=> i===0 ? 'YOU' : players[i].name).join(' and ');
+  SFX.win(winnerNames, handName);
   // no auto-deal, wait for Next Hand button
 }
 
