@@ -199,7 +199,7 @@ const SFX = (() => {
     fold(){ resume(); const z=t(); noise(z,0.09,0.09); tone(300, z, 0.12, 'sawtooth', 0.1, -140); },
     yourTurn(){ resume(); const z=t(); tone(784, z, 0.09, 'square', 0.15); tone(1046, z+0.09, 0.11, 'square', 0.15); },
     tick(urgent){ resume(); tone(urgent?1320:880, t(), 0.045, 'square', urgent?0.16:0.1); },
-    win(names, handName){ resume(); const z=t(), seq=[523,659,784,1046]; seq.forEach((f,i)=>tone(f, z+i*0.09, 0.13, 'square', 0.17)); try{ if(VOICE){ const txt = names ? (names + " wins with " + (handName||"" ) + "!") : (handName ? handName + " wins!" : "We have a winner!"); VOICE.say(txt, {rate:1.3, pitch:1.4}); } }catch(e){} },
+    win(names, handName){ resume(); const z=t(), seq=[523,659,784,1046]; seq.forEach((f,i)=>tone(f, z+i*0.09, 0.13, 'square', 0.17)); try{ if(VOICE){ const cleanHand = (handName && handName !== "Everyone else folded") ? handName : ""; const txt = names ? (names + " wins" + (cleanHand ? " with " + cleanHand : "") + "!") : (handName ? handName + " wins!" : "We have a winner!"); VOICE.say(txt, {rate:1.3, pitch:1.4}); } }catch(e){} },
     lose(){ resume(); const z=t(); [392,330,262].forEach((f,i)=>tone(f, z+i*0.12, 0.14, 'triangle', 0.13)); },
   };
 })();
