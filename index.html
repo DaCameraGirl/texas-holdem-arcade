@@ -286,9 +286,11 @@ let stage = 'waiting'; // preflop, flop, turn, river, showdown
 let dealerIdx = 0;
 let actingIdx = 0;
 let roundBets = [];
+let committed = [];
 let folded = [];
 let allIn = [];
 let acted = [];
+let lastPots = [];
 
 function resetStreetActions(){
   acted = players.map(_=>false);
@@ -394,6 +396,7 @@ function initGame() {
     {name:'BOT-2', chips:1000, hand:[]},
     {name:'BOT-3', chips:1000, hand:[]},
   ];
+  committed = players.map(_=>0);
   dealerIdx = Math.floor(Math.random()*players.length);
   stage='waiting';
   setMessage('Click Deal to start');
@@ -413,6 +416,7 @@ function startHand() {
   currentBet = 0;
   stage = 'preflop';
   roundBets = players.map(_=>0);
+  committed = players.map(_=>0);
   folded = players.map(_=>false);
   allIn = players.map(_=>false);
   resetStreetActions();
@@ -442,6 +446,7 @@ function postBlind(idx, amt) {
   const pay = Math.min(amt, p.chips);
   p.chips -= pay;
   roundBets[idx] = pay;
+  committed[idx] = (committed[idx]||0) + pay;
   pot += pay;
   if(p.chips===0) allIn[idx]=true;
 }
@@ -623,6 +628,7 @@ function doCall(idx){
   const pay = Math.min(toCall, players[idx].chips);
   players[idx].chips -= pay;
   roundBets[idx] += pay;
+  committed[idx] = (committed[idx]||0) + pay;
   pot += pay;
   if(players[idx].chips===0) allIn[idx]=true;
   setMessage(players[idx].name+' calls '+pay);
@@ -633,6 +639,7 @@ function doRaise(idx, total){
   const pay = Math.min(toPut, players[idx].chips);
   players[idx].chips -= pay;
   roundBets[idx] += pay;
+  committed[idx] = (committed[idx]||0) + pay;
   pot += pay;
   currentBet = Math.max(currentBet, roundBets[idx]);
   if(players[idx].chips===0) allIn[idx]=true;
@@ -642,20 +649,106 @@ function doRaise(idx, total){
   markActed(idx);
 }
 
-function awardPot(winners, handName=''){
+function buildPots(amounts, foldedArr){
+  const remaining = amounts.map(n => Math.max(0, +n || 0));
+  const pots = [];
+  while(true){
+    let min = Infinity;
+    for(let i=0;i<remaining.length;i++) if(remaining[i]>0 && remaining[i]<min) min = remaining[i];
+    if(!isFinite(min)) break;
+    const contributors = [];
+    for(let i=0;i<remaining.length;i++) if(remaining[i]>0) contributors.push(i);
+    const amount = min * contributors.length;
+    const eligible = contributors.filter(i => !foldedArr[i]);
+    pots.push({ amount, eligible: eligible.slice(), contributors: contributors.slice() });
+    for(const i of contributors) remaining[i] -= min;
+  }
+  return pots;
+}
+
+function splitPotAmount(amount, winners, buttonIdx, n){
+  const uniq = [...new Set(winners.map(w=>+w))].filter(w => Number.isInteger(w) && w>=0 && w<n);
+  const payouts = {};
+  if(!uniq.length || amount<=0) return payouts;
+  const share = Math.floor(amount / uniq.length);
+  let rem = amount - share * uniq.length;
+  for(const w of uniq) payouts[w] = share;
+  // odd chips go left of the button, seating order
+  for(let k=1; rem>0 && k<=n; k++){
+    const i = (buttonIdx + k) % n;
+    if(payouts[i] !== undefined){
+      payouts[i]++;
+      rem--;
+    }
+  }
+  return payouts;
+}
+
+function winnersOfPot(eligible, fallbackName){
+  if(eligible.length===1){
+    const i = eligible[0];
+    const name = fallbackName || (community.length>=3 ? bestHand(players[i].hand, community).name : 'Everyone else folded');
+    return { winners:[i], handName:name };
+  }
+  const hands = eligible.map(i=> ({i, ev: bestHand(players[i].hand, community)}));
+  hands.sort(compareHandsDesc);
+  const top = hands[0];
+  const winners = hands.filter(h=> h.ev.rank===top.ev.rank && compareTie(h.ev.tie, top.ev.tie)===0).map(h=>h.i);
+  return { winners, handName: top.ev.name };
+}
+
+function settlePots(fallbackName=''){
   stopTurnTimer();
-  // sanitize winner list – must be active, unique, numeric
-  const activeSet = new Set(activePlayers());
-  winners = [...new Set(winners.map(n=>+n).filter(n=> Number.isInteger(n) && activeSet.has(n)))];
-  if(!winners.length) { console.error('awardPot: empty winners, aborting'); return; }
-  for(const w of winners) players[w].chips += Math.floor(pot / winners.length);
-  setMessage((winners.length>1?'Split pot: ':'Winner: ')+winners.map(i=>players[i].name).join(', '));
+  const amounts = (committed && committed.length===players.length)
+    ? committed
+    : players.map((_,i)=> roundBets[i]||0);
+  lastPots = buildPots(amounts, folded);
+  const live = activePlayers();
+  const received = [];
+  let headline = fallbackName;
+  let headlineWinners = [];
+
+  for(const p of lastPots){
+    if(p.amount<=0) continue;
+    let eligible = p.eligible.filter(i => live.includes(i));
+    if(!eligible.length) eligible = live.slice();
+    if(!eligible.length) continue;
+    const { winners, handName } = winnersOfPot(eligible, fallbackName);
+    const payouts = splitPotAmount(p.amount, winners, dealerIdx, players.length);
+    p.winners = winners;
+    p.payouts = payouts;
+    p.handName = handName;
+    for(const w of winners){
+      const add = payouts[w]||0;
+      players[w].chips += add;
+      if(add>0 && !received.includes(w)) received.push(w);
+    }
+    if(!headlineWinners.length){
+      headlineWinners = winners.slice();
+      headline = handName || fallbackName;
+    }
+  }
+
+  const paid = lastPots.reduce((s,p)=> s + Object.values(p.payouts||{}).reduce((a,b)=>a+b,0), 0);
+  const expected = amounts.reduce((s,n)=>s+(+n||0), 0);
+  if(paid !== expected){
+    console.error('settlePots: chip mismatch', { paid, expected, lastPots });
+  }
+
+  pot = 0;
+  committed = players.map(_=>0);
+  const winners = received.length ? received : live;
+  if(!winners.length){ console.error('settlePots: empty winners, aborting'); return; }
   stage='showdown';
+  setMessage((winners.length>1?'Winners: ':'Winner: ')+winners.map(i=>players[i].name).join(', '));
   updateUI(); draw();
-  showWinnerBanner(winners, handName);
+  showWinnerBanner(winners, headline);
   const winnerNames = winners.map(i=> i===0 ? 'YOU' : players[i].name).join(' and ');
-  SFX.win(winnerNames, handName);
-  // no auto-deal, wait for Next Hand button
+  SFX.win(winnerNames, headline);
+}
+
+function awardPot(winners, handName=''){
+  settlePots(handName);
 }
 
 function showdown(){
@@ -663,10 +756,8 @@ function showdown(){
   const remain = activePlayers();
   const hands = remain.map(i=> ({i, ev: bestHand(players[i].hand, community)}));
   hands.sort(compareHandsDesc);
-  const top = hands[0];
-  const winners = hands.filter(h=> h.ev.rank===top.ev.rank && compareTie(h.ev.tie, top.ev.tie)===0).map(h=>h.i);
-  console.log('[showdown]', hands.map(h=>({player:players[h.i].name, i:h.i, rank:h.ev.name, tie:h.ev.tie})), 'winners:', winners.map(i=>players[i].name));
-  awardPot(winners, top.ev.name);
+  settlePots();
+  console.log('[showdown]', hands.map(h=>({player:players[h.i].name, i:h.i, rank:h.ev.name, tie:h.ev.tie})), 'pots:', lastPots);
 }
 
 // --- Bot ---

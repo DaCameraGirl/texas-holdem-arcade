@@ -29,6 +29,7 @@ function setupAllInHeadsUp() {
   g.allIn = [true, true, false, false];
   g.acted = [true, true, true, true];
   g.roundBets = [1000, 1000, 0, 0];
+  g.committed = [1000, 1000, 0, 0];
   g.currentBet = 1000;
   g.stage = 'preflop';
   g.actingIdx = 1;
@@ -60,7 +61,7 @@ function setupAllInHeadsUp() {
   check('all-in runout puts 5 community cards out', g.community.length === 5, `board=${g.community.length}`);
   check('showdown awards a remaining player', Array.isArray(g.showdownWinners) && g.showdownWinners.length >= 1, JSON.stringify(g.showdownWinners));
   const chips = g.players.reduce((s, p) => s + p.chips, 0);
-  check('winner received the pot chips', g.players[0].chips + g.players[1].chips >= 2000, `you=${g.players[0].chips} bot1=${g.players[1].chips} sum=${chips} pot=${g.pot}`);
+  check('winner received the pot chips', g.players[0].chips + g.players[1].chips >= 2000 && g.pot === 0, `you=${g.players[0].chips} bot1=${g.players[1].chips} sum=${chips} pot=${g.pot}`);
 }
 
 // 3) live players still take a turn (no false runout)

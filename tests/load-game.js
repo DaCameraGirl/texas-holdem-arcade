@@ -101,6 +101,8 @@ function loadGame() {
         get allIn(){ return allIn; }, set allIn(v){ allIn = v; },
         get acted(){ return acted; }, set acted(v){ acted = v; },
         get roundBets(){ return roundBets; }, set roundBets(v){ roundBets = v; },
+        get committed(){ return committed; }, set committed(v){ committed = v; },
+        get lastPots(){ return lastPots; },
         get stage(){ return stage; }, set stage(v){ stage = v; },
         get actingIdx(){ return actingIdx; }, set actingIdx(v){ actingIdx = v; },
         get dealerIdx(){ return dealerIdx; }, set dealerIdx(v){ dealerIdx = v; },
@@ -113,6 +115,7 @@ function loadGame() {
         bettingDone, nextStage, startBettingRound, botDecision, botTurnIfNeeded,
         awardPot, showdown, bestHand, evalHand, activePlayers, playersWhoCanAct,
         postBlind, humanCanAct, handleTurnTimeout, nextActive, runOutBoard,
+        buildPots, splitPotAmount, settlePots,
       };
     `
   );
