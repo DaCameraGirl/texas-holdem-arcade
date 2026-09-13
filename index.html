@@ -412,6 +412,14 @@ function startHand() {
   hideWinnerBanner();
   const hr = document.getElementById('hand-rank');
   if(hr){ hr.dataset.prevRank = -1; hr.className=''; }
+  if(players[dealerIdx] && players[dealerIdx].chips <= 0) dealerIdx = nextLiveSeat(dealerIdx);
+  const live = liveSeats();
+  if(live.length < 2){
+    stage = 'waiting';
+    setMessage('Game over');
+    updateUI(); draw();
+    return;
+  }
   deck = newDeck();
   community = [];
   pot = 0;
@@ -419,13 +427,18 @@ function startHand() {
   stage = 'preflop';
   roundBets = players.map(_=>0);
   committed = players.map(_=>0);
-  folded = players.map(_=>false);
+  folded = players.map(p => p.chips <= 0);
   allIn = players.map(_=>false);
   resetStreetActions();
   for(const p of players) p.hand = [];
 
-  // deal 2 each
-  for(let i=0;i<2;i++) for(let j=0;j<players.length;j++) players[(dealerIdx+1+j)%players.length].hand.push(deck.pop());
+  // deal only to players with chips, left of button first
+  for(let c=0;c<2;c++){
+    for(let k=1;k<=players.length;k++){
+      const i = (dealerIdx+k)%players.length;
+      if(players[i].chips > 0) players[i].hand.push(deck.pop());
+    }
+  }
 
   // blinds: posting is not a voluntary action. In a limped pot the BB still
   // gets the option to check or raise. Heads-up: button is SB and acts first.
@@ -455,17 +468,30 @@ function postBlind(idx, amt) {
 function setMessage(t){ document.getElementById('msg').textContent=t; }
 
 function activePlayers(){ return players.map((_,i)=>i).filter(i=>!folded[i]); }
-function playersWhoCanAct(){ return players.map((_,i)=>i).filter(i=>!folded[i] && !allIn[i]); }
-function preflopBlindSeats(){
+function playersWhoCanAct(){ return players.map((_,i)=>i).filter(i=>!folded[i] && !allIn[i] && players[i].chips>0); }
+function liveSeats(){ return players.map((_,i)=>i).filter(i => players[i].chips > 0); }
+function nextLiveSeat(from){
   const n = players.length;
-  if(n === 2){
-    return { sb: dealerIdx, bb: (dealerIdx+1)%n, first: dealerIdx };
+  for(let k=1;k<=n;k++){
+    const i = (from+k)%n;
+    if(players[i] && players[i].chips > 0) return i;
   }
-  return {
-    sb: (dealerIdx+1)%n,
-    bb: (dealerIdx+2)%n,
-    first: (dealerIdx+3)%n
-  };
+  return from;
+}
+function advanceButton(){
+  dealerIdx = nextLiveSeat(dealerIdx);
+}
+function preflopBlindSeats(){
+  const live = liveSeats();
+  if(live.length === 2){
+    const sb = players[dealerIdx] && players[dealerIdx].chips > 0 ? dealerIdx : nextLiveSeat(dealerIdx);
+    const bb = nextLiveSeat(sb);
+    return { sb, bb, first: sb };
+  }
+  const sb = nextLiveSeat(dealerIdx);
+  const bb = nextLiveSeat(sb);
+  const first = nextLiveSeat(bb);
+  return { sb, bb, first };
 }
 function bettingDone(){
   const act = activePlayers();
@@ -524,7 +550,7 @@ function nextStage(){
 function nextActive(start){
   for(let k=0;k<players.length*2;k++){
     const i = (start+k)%players.length;
-    if(!folded[i] && !allIn[i]) return i;
+    if(!folded[i] && !allIn[i] && players[i].chips>0) return i;
   }
   return start;
 }
@@ -541,7 +567,7 @@ function advanceAction(){
   do{
     actingIdx = (actingIdx+1)%players.length;
     hops++;
-  } while((folded[actingIdx]||allIn[actingIdx]) && hops < players.length);
+  } while((folded[actingIdx]||allIn[actingIdx]||players[actingIdx].chips<=0) && hops < players.length);
 
   if(bettingDone()){
     const live = playersWhoCanAct();
@@ -851,13 +877,13 @@ function botDecision(idx){
 
 function botTurnIfNeeded(){
   if(stage==='showdown' || stage==='waiting') return;
-  if(folded[actingIdx]||allIn[actingIdx]) { advanceAction(); return; }
+  if(folded[actingIdx]||allIn[actingIdx]||players[actingIdx].chips<=0) { advanceAction(); return; }
   const p = players[actingIdx];
   if(p.isHuman){ SFX.yourTurn(); return; }
   const delay = 1500 + Math.random()*1000;
   setTimeout(()=>{
     if(stage==='showdown' || stage==='waiting') return;
-    if(folded[actingIdx]||allIn[actingIdx]) { advanceAction(); return; }
+    if(folded[actingIdx]||allIn[actingIdx]||players[actingIdx].chips<=0) { advanceAction(); return; }
     const dec = botDecision(actingIdx);
     if(dec.act==='fold'){ if(doFold(actingIdx)) return; }
     else if(dec.act==='check') doCheck(actingIdx);
@@ -887,7 +913,7 @@ betInput.oninput = e=> syncBet(+e.target.value);
 
 function humanCanAct(){
   return !!players[actingIdx]?.isHuman && stage!=='showdown' && stage!=='waiting'
-    && !folded[actingIdx] && !allIn[actingIdx];
+    && !folded[actingIdx] && !allIn[actingIdx] && players[actingIdx].chips>0;
 }
 
 btnFold.onclick = ()=>{ if(!humanCanAct()) return; if(doFold(actingIdx)) return; advanceAction(); };
@@ -905,8 +931,10 @@ btnBet.onclick = ()=>{
   updateUI(); draw(); advanceAction();
 };
 btnNext.onclick = ()=> { 
-  if(stage==='showdown' || stage==='waiting') {
-    dealerIdx = (dealerIdx+1)%players.length;
+  if(stage==='showdown'){
+    advanceButton();
+    startHand();
+  } else if(stage==='waiting'){
     startHand();
   }
 };

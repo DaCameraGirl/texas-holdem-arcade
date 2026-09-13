@@ -117,7 +117,7 @@ function loadGame() {
         awardPot, showdown, bestHand, evalHand, activePlayers, playersWhoCanAct,
         postBlind, humanCanAct, handleTurnTimeout, nextActive, runOutBoard,
         buildPots, splitPotAmount, settlePots, preflopBlindSeats,
-        minRaiseTo, playerCanRaise,
+        minRaiseTo, playerCanRaise, liveSeats, nextLiveSeat, advanceButton,
       };
     `
   );
