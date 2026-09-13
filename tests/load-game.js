@@ -107,6 +107,7 @@ function loadGame() {
         get actingIdx(){ return actingIdx; }, set actingIdx(v){ actingIdx = v; },
         get dealerIdx(){ return dealerIdx; }, set dealerIdx(v){ dealerIdx = v; },
         get currentBet(){ return currentBet; }, set currentBet(v){ currentBet = v; },
+        get lastFullRaise(){ return lastFullRaise; }, set lastFullRaise(v){ lastFullRaise = v; },
         get pot(){ return pot; }, set pot(v){ pot = v; },
         get community(){ return community; }, set community(v){ community = v; },
         get deck(){ return deck; }, set deck(v){ deck = v; },
@@ -116,6 +117,7 @@ function loadGame() {
         awardPot, showdown, bestHand, evalHand, activePlayers, playersWhoCanAct,
         postBlind, humanCanAct, handleTurnTimeout, nextActive, runOutBoard,
         buildPots, splitPotAmount, settlePots, preflopBlindSeats,
+        minRaiseTo, playerCanRaise,
       };
     `
   );

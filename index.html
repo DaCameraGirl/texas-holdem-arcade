@@ -291,9 +291,11 @@ let folded = [];
 let allIn = [];
 let acted = [];
 let lastPots = [];
+let lastFullRaise = 10;
 
 function resetStreetActions(){
   acted = players.map(_=>false);
+  lastFullRaise = 10;
 }
 function markActed(i){ acted[i] = true; }
 
@@ -431,6 +433,7 @@ function startHand() {
   postBlind(blinds.sb, 5);
   postBlind(blinds.bb, 10);
   currentBet = 10;
+  lastFullRaise = 10;
   actingIdx = nextActive(blinds.first);
   setMessage('Pre-flop betting');
   updateUI();
@@ -495,6 +498,7 @@ function nextStage(){
   try{ VOICE.cancel(); }catch(e){}
   roundBets = players.map(_=>0);
   currentBet = 0;
+  lastFullRaise = 10;
 
   if(stage==='preflop'){
     community.push(deck.pop(),deck.pop(),deck.pop()); stage='flop';
@@ -630,6 +634,15 @@ function doCheck(idx){
   SFX.check();
   setMessage(players[idx].name+' checks');
 }
+function minRaiseTo(){
+  return currentBet + lastFullRaise;
+}
+function playerCanRaise(idx){
+  if(folded[idx] || allIn[idx]) return false;
+  if(acted[idx]) return false;
+  const toCall = Math.max(0, currentBet - (roundBets[idx]||0));
+  return players[idx].chips > toCall;
+}
 function doCall(idx){
   markActed(idx);
   SFX.chip();
@@ -643,18 +656,52 @@ function doCall(idx){
   setMessage(players[idx].name+' calls '+pay);
 }
 function doRaise(idx, total){
+  const maxTotal = roundBets[idx] + players[idx].chips;
+  let target = Math.min(Math.max(0, +total||0), maxTotal);
+  if(target <= currentBet){
+    doCall(idx);
+    return;
+  }
+  const willAllIn = target >= maxTotal;
+  const opening = currentBet === 0;
+  const increment = target - currentBet;
+  let full = opening ? target >= 10 : increment >= lastFullRaise;
+  if(!full && !willAllIn){
+    const floor = opening ? 10 : minRaiseTo();
+    if(maxTotal >= floor){
+      target = Math.max(target, floor);
+      full = true;
+    } else {
+      doCall(idx);
+      return;
+    }
+  }
+  // already-acted players may only call/fold unless a full raise reopened them
+  if(acted[idx]){
+    doCall(idx);
+    return;
+  }
+
   SFX.chip();
-  const toPut = total - roundBets[idx];
+  const toPut = target - roundBets[idx];
   const pay = Math.min(toPut, players[idx].chips);
   players[idx].chips -= pay;
   roundBets[idx] += pay;
   committed[idx] = (committed[idx]||0) + pay;
   pot += pay;
-  currentBet = Math.max(currentBet, roundBets[idx]);
+  const newTotal = roundBets[idx];
+  const inc = newTotal - currentBet;
+  const wasOpening = currentBet === 0;
+  const isFull = wasOpening ? newTotal >= 10 : inc >= lastFullRaise;
+  currentBet = Math.max(currentBet, newTotal);
   if(players[idx].chips===0) allIn[idx]=true;
-  setMessage(players[idx].name+' raises to '+roundBets[idx]);
-  // raise reopens action – everyone else needs to act again
-  for(let i=0;i<players.length;i++) if(i!==idx && !folded[i] && !allIn[i]) acted[i]=false;
+  if(isFull){
+    lastFullRaise = wasOpening ? newTotal : inc;
+    for(let i=0;i<players.length;i++) if(i!==idx && !folded[i] && !allIn[i]) acted[i]=false;
+    setMessage(players[idx].name+' raises to '+newTotal);
+  } else {
+    setMessage(players[idx].name+' all-in '+newTotal);
+  }
   markActed(idx);
 }
 
@@ -785,11 +832,19 @@ function botDecision(idx){
   }
   const r = Math.random();
   if(toCall===0){
-    if(strength>0.55 && r>0.3) return {act:'raise', amt: Math.min(players[idx].chips, 20 + Math.floor(strength*60))};
+    if(playerCanRaise(idx) && strength>0.55 && r>0.3){
+      const floor = currentBet===0 ? 10 : minRaiseTo();
+      const maxTo = roundBets[idx] + players[idx].chips;
+      return {act:'raise', amt: Math.min(maxTo, Math.max(floor, 20 + Math.floor(strength*60)))};
+    }
     return {act:'check'};
   }
   if(toCall > players[idx].chips*0.4 && strength<0.5) return {act:'fold'};
-  if(strength>0.6 && r>0.4) return {act:'raise', amt: Math.min(players[idx].chips+roundBets[idx], currentBet + 20 + Math.floor(strength*50))};
+  if(playerCanRaise(idx) && strength>0.6 && r>0.4){
+    const floor = minRaiseTo();
+    const maxTo = roundBets[idx] + players[idx].chips;
+    return {act:'raise', amt: Math.min(maxTo, Math.max(floor, currentBet + 20 + Math.floor(strength*50)))};
+  }
   if(strength>0.25 || toCall < 30) return {act:'call'};
   return {act:'fold'};
 }
@@ -840,8 +895,13 @@ btnCheck.onclick = ()=>{ if(!humanCanAct()) return; const toCall=currentBet-roun
 btnCall.onclick = ()=>{ if(!humanCanAct()) return; doCall(actingIdx); advanceAction(); };
 btnBet.onclick = ()=>{
   if(!humanCanAct()) return;
-  const amt = Math.max(currentBet+10, +betInput.value|0);
-  doRaise(actingIdx, amt);
+  if(!playerCanRaise(actingIdx)) return;
+  const maxTotal = roundBets[actingIdx] + players[actingIdx].chips;
+  const floor = currentBet===0 ? 10 : minRaiseTo();
+  let amt = +betInput.value|0;
+  if(maxTotal < floor) amt = maxTotal;
+  else amt = Math.max(floor, amt);
+  doRaise(actingIdx, Math.min(amt, maxTotal));
   updateUI(); draw(); advanceAction();
 };
 btnNext.onclick = ()=> { 
@@ -864,13 +924,14 @@ function updateUI(){
   btnCall.disabled = !canAct || toCall<=0;
   btnCheck.disabled = !canAct || toCall>0;
   btnFold.disabled = !canAct;
-  btnBet.disabled = !canAct;
+  btnBet.disabled = !canAct || !playerCanRaise(0);
 
   document.getElementById('pot').textContent = pot;
   document.getElementById('player-chips').textContent = you?.chips ?? 1000;
   const maxBet = (you?.chips||0) + roundBets[0];
+  const minFull = currentBet===0 ? 10 : minRaiseTo();
   betSlider.max = maxBet;
-  betSlider.min = Math.min(currentBet+10, maxBet);
+  betSlider.min = Math.min(maxBet >= minFull ? minFull : maxBet, maxBet);
   betInput.min = betSlider.min;
   betInput.max = maxBet;
   const hr = document.getElementById('hand-rank');

@@ -45,6 +45,7 @@ The acting player glows yellow on the table. Buttons only unlock on your turn.
 - [x] All-in board runout (no freeze when everyone remaining is all-in)
 - [x] All-in side pots
 - [x] Big Blind preflop option in a limped pot
+- [x] No-limit min-raise and short-all-in reopening
 - [ ] Rebuy / player count options
 - [ ] Mobile layout polish
 - [ ] Hand history / stats
