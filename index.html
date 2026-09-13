@@ -331,7 +331,7 @@ function stopTurnTimer(){
 function handleTurnTimeout(){
   if(stage==='showdown' || stage==='waiting') return;
   const idx = actingIdx;
-  if(folded[idx] || allIn[idx]) return;
+  if(folded[idx] || allIn[idx]) { advanceAction(); return; }
   const toCall = currentBet - roundBets[idx];
   if(toCall === 0){
     doCheck(idx);
@@ -449,6 +449,7 @@ function postBlind(idx, amt) {
 function setMessage(t){ document.getElementById('msg').textContent=t; }
 
 function activePlayers(){ return players.map((_,i)=>i).filter(i=>!folded[i]); }
+function playersWhoCanAct(){ return players.map((_,i)=>i).filter(i=>!folded[i] && !allIn[i]); }
 function bettingDone(){
   const act = activePlayers();
   if(act.length<=1) return true;
@@ -456,9 +457,19 @@ function bettingDone(){
   return act.every(i => (acted[i]||allIn[i]) && (allIn[i] || roundBets[i]===currentBet));
 }
 
+function runOutBoard(){
+  if(stage==='showdown' || stage==='waiting') return;
+  if(stage==='river'){ showdown(); return; }
+  nextStage();
+}
+
 function startBettingRound(){
   resetStreetActions();
-  // first to act is left of dealer, skip folded/all-in
+  // no betting if fewer than 2 players can still act (all-in runout)
+  if(playersWhoCanAct().length <= 1){
+    setTimeout(runOutBoard, 1500);
+    return;
+  }
   actingIdx = nextActive((dealerIdx+1)%players.length);
   updateUI(); draw();
   startTurnTimer();
@@ -484,6 +495,10 @@ function nextStage(){
     showdown(); return;
   }
   updateUI();
+  if(playersWhoCanAct().length <= 1){
+    setTimeout(runOutBoard, 1500);
+    return;
+  }
   // give players a beat to see the cards before betting resumes
   setTimeout(()=> startBettingRound(), 1800);
 }
@@ -498,21 +513,23 @@ function nextActive(start){
 
 function advanceAction(){
   stopTurnTimer();
-  // move to next live player
+  // remaining players are all-in: never busy-loop, just run the board
+  if(playersWhoCanAct().length === 0){
+    if(stage==='river'){ showdown(); return; }
+    setTimeout(runOutBoard, 1500);
+    return;
+  }
+  let hops = 0;
   do{
     actingIdx = (actingIdx+1)%players.length;
-  } while((folded[actingIdx]||allIn[actingIdx]) && activePlayers().length>1);
-  
+    hops++;
+  } while((folded[actingIdx]||allIn[actingIdx]) && hops < players.length);
+
   if(bettingDone()){
-    const live = activePlayers().filter(i=>!allIn[i]);
+    const live = playersWhoCanAct();
     if(live.length<=1 || stage==='river'){
       if(stage==='river'){ showdown(); return; }
-      // run out remaining board with pauses so dealer can talk
-      const runOut = ()=>{
-        if(stage==='river'){ showdown(); return; }
-        nextStage();
-      };
-      setTimeout(runOut, 1500);
+      setTimeout(runOutBoard, 1500);
       return;
     }
     nextStage(); return;
@@ -679,10 +696,12 @@ function botDecision(idx){
 
 function botTurnIfNeeded(){
   if(stage==='showdown' || stage==='waiting') return;
+  if(folded[actingIdx]||allIn[actingIdx]) { advanceAction(); return; }
   const p = players[actingIdx];
   if(p.isHuman){ SFX.yourTurn(); return; }
   const delay = 1500 + Math.random()*1000;
   setTimeout(()=>{
+    if(stage==='showdown' || stage==='waiting') return;
     if(folded[actingIdx]||allIn[actingIdx]) { advanceAction(); return; }
     const dec = botDecision(actingIdx);
     if(dec.act==='fold'){ if(doFold(actingIdx)) return; }
@@ -711,7 +730,10 @@ function syncBet(val){
 betSlider.oninput = e=> syncBet(+e.target.value);
 betInput.oninput = e=> syncBet(+e.target.value);
 
-function humanCanAct(){ return players[actingIdx]?.isHuman && stage!=='showdown' && stage!=='waiting'; }
+function humanCanAct(){
+  return !!players[actingIdx]?.isHuman && stage!=='showdown' && stage!=='waiting'
+    && !folded[actingIdx] && !allIn[actingIdx];
+}
 
 btnFold.onclick = ()=>{ if(!humanCanAct()) return; if(doFold(actingIdx)) return; advanceAction(); };
 btnCheck.onclick = ()=>{ if(!humanCanAct()) return; const toCall=currentBet-roundBets[actingIdx]; if(toCall>0) return; doCheck(actingIdx); advanceAction(); };

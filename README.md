@@ -41,7 +41,8 @@ The acting player glows yellow on the table. Buttons only unlock on your turn.
 ## 🛠 Fine-Tuning Roadmap
 
 - [ ] Bot difficulty levels
-- [ ] Sound effects / chip clinks
+- [x] Sound effects / chip clinks
+- [x] All-in board runout (no freeze when everyone remaining is all-in)
 - [ ] All-in side pots
 - [ ] Rebuy / player count options
 - [ ] Mobile layout polish
@@ -60,6 +61,12 @@ cd texas-holdem-arcade
 ```
 
 That's it. No npm, no build.
+
+Engine regression (all-in runout, no hang):
+
+```bash
+node tests/allin-runout.test.js
+```
 
 ---
 
