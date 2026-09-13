@@ -44,6 +44,7 @@ The acting player glows yellow on the table. Buttons only unlock on your turn.
 - [x] Sound effects / chip clinks
 - [x] All-in board runout (no freeze when everyone remaining is all-in)
 - [x] All-in side pots
+- [x] Big Blind preflop option in a limped pot
 - [ ] Rebuy / player count options
 - [ ] Mobile layout polish
 - [ ] Hand history / stats

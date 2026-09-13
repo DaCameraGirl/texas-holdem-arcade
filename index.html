@@ -425,15 +425,13 @@ function startHand() {
   // deal 2 each
   for(let i=0;i<2;i++) for(let j=0;j<players.length;j++) players[(dealerIdx+1+j)%players.length].hand.push(deck.pop());
 
-  // blinds
-  const sb = (dealerIdx+1)%players.length;
-  const bb = (dealerIdx+2)%players.length;
-  postBlind(sb, 5);
-  postBlind(bb, 10);
+  // blinds: posting is not a voluntary action. In a limped pot the BB still
+  // gets the option to check or raise. Heads-up: button is SB and acts first.
+  const blinds = preflopBlindSeats();
+  postBlind(blinds.sb, 5);
+  postBlind(blinds.bb, 10);
   currentBet = 10;
-  // blinds count as acted preflop
-  markActed(sb); markActed(bb);
-  actingIdx = (dealerIdx+3)%players.length;
+  actingIdx = nextActive(blinds.first);
   setMessage('Pre-flop betting');
   updateUI();
   draw();
@@ -455,6 +453,17 @@ function setMessage(t){ document.getElementById('msg').textContent=t; }
 
 function activePlayers(){ return players.map((_,i)=>i).filter(i=>!folded[i]); }
 function playersWhoCanAct(){ return players.map((_,i)=>i).filter(i=>!folded[i] && !allIn[i]); }
+function preflopBlindSeats(){
+  const n = players.length;
+  if(n === 2){
+    return { sb: dealerIdx, bb: (dealerIdx+1)%n, first: dealerIdx };
+  }
+  return {
+    sb: (dealerIdx+1)%n,
+    bb: (dealerIdx+2)%n,
+    first: (dealerIdx+3)%n
+  };
+}
 function bettingDone(){
   const act = activePlayers();
   if(act.length<=1) return true;

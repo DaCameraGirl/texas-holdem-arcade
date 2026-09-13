@@ -115,7 +115,7 @@ function loadGame() {
         bettingDone, nextStage, startBettingRound, botDecision, botTurnIfNeeded,
         awardPot, showdown, bestHand, evalHand, activePlayers, playersWhoCanAct,
         postBlind, humanCanAct, handleTurnTimeout, nextActive, runOutBoard,
-        buildPots, splitPotAmount, settlePots,
+        buildPots, splitPotAmount, settlePots, preflopBlindSeats,
       };
     `
   );
