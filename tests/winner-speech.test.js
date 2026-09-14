@@ -12,6 +12,7 @@ function card(r, s) { return { r, s, v: VAL[r] }; }
 function hand(cards) { return cards.map(([r, s]) => card(r, s)); }
 function lastSpoken(g) { return g._spoken[g._spoken.length - 1]; }
 function winnerText(g) { return g._els['winner-banner'].innerHTML; }
+function cancelEvents(g) { return g._speechEvents.filter(e => e.type === 'cancel'); }
 
 function setupGame() {
   const g = loadGame();
@@ -89,8 +90,40 @@ function settleFoldOutWinner(winnerIdx) {
   check('SFX human winner speech is grammatical',
     lastSpoken(g) === 'You win with a straight.',
     JSON.stringify(g._spoken));
+  g.endSpeech();
   g.SFX.win([1], 'Straight');
   check('SFX bot winner speech is grammatical',
+    lastSpoken(g) === 'Bot 1 wins with a straight.',
+    JSON.stringify(g._spoken));
+}
+
+{
+  const g = setupGame();
+  g.SFX.river();
+  g.flushTimers();
+  const riverLine = lastSpoken(g);
+  g.SFX.win([0], 'Straight');
+  check('winner speech waits for active river announcement',
+    lastSpoken(g) === riverLine && g._spoken.length === 1,
+    JSON.stringify(g._spoken));
+  check('active river announcement is not canceled by winner speech',
+    cancelEvents(g).length === 0,
+    JSON.stringify(g._speechEvents));
+  g.endSpeech();
+  check('winner speech starts after river announcement ends',
+    lastSpoken(g) === 'You win with a straight.',
+    JSON.stringify(g._spoken));
+}
+
+{
+  const g = setupGame();
+  g.SFX.river();
+  g.SFX.win([1], 'Straight');
+  check('winner speech preserves pending river announcement first',
+    g._spoken.length === 1 && lastSpoken(g) !== 'Bot 1 wins with a straight.',
+    JSON.stringify(g._spoken));
+  g.endSpeech();
+  check('pending river announcement is followed by bot winner speech',
     lastSpoken(g) === 'Bot 1 wins with a straight.',
     JSON.stringify(g._spoken));
 }

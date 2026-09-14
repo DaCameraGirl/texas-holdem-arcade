@@ -82,10 +82,19 @@ function loadGame() {
   const setTimeoutFn = (fn) => { const id = { fn }; timers.push(id); return id; };
   const clearTimeoutFn = (id) => { const i = timers.indexOf(id); if (i >= 0) timers.splice(i, 1); };
   const spoken = [];
+  const speechEvents = [];
+  let activeUtterance = null;
   const speechSynthesis = {
     getVoices() { return [{ name: 'Test English' }]; },
-    cancel() {},
-    speak(u) { spoken.push(u.text); },
+    cancel() {
+      if (activeUtterance) speechEvents.push({ type: 'cancel', text: activeUtterance.text });
+      activeUtterance = null;
+    },
+    speak(u) {
+      activeUtterance = u;
+      spoken.push(u.text);
+      speechEvents.push({ type: 'speak', text: u.text });
+    },
     onvoiceschanged: null,
   };
   function SpeechSynthesisUtterance(t) { this.text = t; }
@@ -118,7 +127,7 @@ function loadGame() {
         get community(){ return community; }, set community(v){ community = v; },
         get deck(){ return deck; }, set deck(v){ deck = v; },
         get showdownWinners(){ return showdownWinners; },
-        advanceAction, startHand, initGame, doFold, doCall, doRaise, doCheck,
+        advanceAction, startHand, initGame, doFold, doCall, doRaise, doCheck, updateUI,
         bettingDone, nextStage, startBettingRound, botDecision, botTurnIfNeeded,
         awardPot, showdown, bestHand, evalHand, activePlayers, playersWhoCanAct,
         postBlind, humanCanAct, handleTurnTimeout, nextActive, runOutBoard,
@@ -138,6 +147,12 @@ function loadGame() {
   api._timers = timers;
   api._els = els;
   api._spoken = spoken;
+  api._speechEvents = speechEvents;
+  api.endSpeech = () => {
+    const u = activeUtterance;
+    activeUtterance = null;
+    if (u && typeof u.onend === 'function') u.onend();
+  };
   api.flushTimers = () => {
     const batch = timers.splice(0, timers.length);
     for (const t of batch) t.fn();

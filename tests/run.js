@@ -2,7 +2,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const files = ['allin-runout.test.js', 'side-pots.test.js', 'bb-option.test.js', 'min-raise.test.js', 'rotation.test.js', 'hand-evaluator.test.js', 'winner-speech.test.js'];
+const files = ['allin-runout.test.js', 'side-pots.test.js', 'bb-option.test.js', 'min-raise.test.js', 'rotation.test.js', 'hand-evaluator.test.js', 'winner-speech.test.js', 'control-labels.test.js'];
 let failed = 0;
 for (const file of files) {
   console.log(`\n=== ${file} ===`);
