@@ -1,6 +1,6 @@
 # 🃏 Texas Hold'em Arcade
 
-Retro arcade-style Texas Hold'em poker — play against 3 bots right in your browser. No install, no account, just cards.
+Premium casino-table Texas Hold'em poker — play against 3 bots right in your browser. No install, no account, just cards.
 
 **▶️ Play now:** https://dacameragirl.github.io/texas-holdem-arcade/
 
@@ -30,9 +30,10 @@ The acting player glows yellow on the table. Buttons only unlock on your turn.
 
 - Full 52-card deck with proper shuffling
 - Complete 7-card hand evaluator (Royal Flush → High Card)
+- Premium casino-table layout with seat medallions, chip stacks, and winner highlights
 - Pre-flop / Flop / Turn / River betting rounds
 - Bot AI that plays off actual hand strength
-- Retro arcade styling — green felt, gold trim, Press Start 2P font
+- Premium casino styling — oval felt table, leather rail, gold trim, modern controls
 - Single self-contained `index.html` — no build step, no dependencies except Google Fonts
 - GitHub Pages ready
 

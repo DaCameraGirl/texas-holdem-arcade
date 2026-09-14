@@ -3,129 +3,255 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Texas Hold'em - Retro Arcade</title>
+<title>Texas Hold'em Arcade</title>
+<link rel="icon" href="data:,">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;600;700;800&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --room-0:#090707;
+    --room-1:#16100f;
+    --room-2:#271714;
+    --gold:#d7b46a;
+    --gold-bright:#f4d486;
+    --felt:#0b5a3b;
+    --felt-deep:#053421;
+    --leather:#3a1912;
+    --leather-dark:#180b08;
+    --ivory:#f7ecd8;
+    --muted:#b9aa91;
+    --danger:#b94136;
+    --green:#36c47b;
+  }
+  html, body { width:100%; min-height:100%; }
   body {
-    background:#0a0a0a;
-    color:#e8e8e8;
-    font-family:'Press Start 2P', monospace;
+    color:var(--ivory);
+    font-family:'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    height:100dvh;
+    overflow:hidden;
     display:flex;
     justify-content:center;
     align-items:center;
-    min-height:100vh;
-    overflow:hidden;
+    padding:clamp(8px, 1.4vw, 18px);
+    background:
+      radial-gradient(circle at 50% 18%, rgba(215,180,106,0.16), transparent 26%),
+      radial-gradient(ellipse at 12% 86%, rgba(87,35,27,0.56), transparent 34%),
+      radial-gradient(ellipse at 88% 86%, rgba(19,67,47,0.36), transparent 36%),
+      linear-gradient(180deg, var(--room-1), var(--room-0) 62%, #050404);
+  }
+  body::before {
+    content:'';
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px) 0 0 / 96px 100%,
+      radial-gradient(ellipse at center, transparent 44%, rgba(0,0,0,0.72) 100%);
+    mix-blend-mode:screen;
+    opacity:.45;
+  }
+  body::after {
+    content:'';
+    position:fixed;
+    left:-8vw; right:-8vw; bottom:-22vh; height:42vh;
+    pointer-events:none;
+    background:radial-gradient(ellipse at center, rgba(117,75,42,0.34), rgba(12,7,6,0.92) 62%, #040303 100%);
+    filter:blur(1px);
   }
   #game-wrap {
-    width:960px;
-    max-width:100vw;
+    position:relative;
+    z-index:1;
+    width:min(1220px, calc(100vw - 20px));
+    height:calc(100dvh - 20px);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
   }
   #canvas-holder {
     position:relative;
-    background:#143a1a;
-    border:4px solid #d4af37;
-    border-radius:16px;
-    box-shadow:0 0 30px rgba(212,175,55,0.3), inset 0 0 80px rgba(0,0,0,0.5);
-  }
-  canvas { display:block; border-radius:12px; }
-  #ui-bar {
+    flex:1 1 auto;
+    min-height:0;
     display:flex;
-    justify-content:space-between;
     align-items:center;
-    padding:10px 16px;
-    background:#111;
-    border:3px solid #d4af37;
-    border-radius:10px;
-    margin-top:8px;
-    font-size:10px;
+    justify-content:center;
+    padding:clamp(4px, .7vw, 10px);
+    border:1px solid rgba(244,212,134,.38);
+    border-radius:18px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.015)),
+      rgba(14,9,8,.72);
+    box-shadow:0 24px 80px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.05);
+    overflow:hidden;
+  }
+  canvas {
+    display:block;
+    width:min(100%, calc((100dvh - 174px) * 1.685714));
+    max-height:calc(100dvh - 174px);
+    height:auto;
+    border-radius:14px;
+    filter:drop-shadow(0 18px 30px rgba(0,0,0,.45));
+  }
+  .action-dock, .table-stats {
+    flex:0 0 auto;
+    border:1px solid rgba(215,180,106,.45);
+    background:linear-gradient(180deg, rgba(41,27,20,.94), rgba(13,9,8,.96));
+    box-shadow:0 14px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .action-dock {
+    display:grid;
+    grid-template-columns:minmax(220px, 1fr) auto;
+    align-items:center;
     gap:12px;
-    flex-wrap:wrap;
+    padding:10px 12px;
+    border-radius:14px;
   }
-  #ui-bar span { color:#d4af37; }
-  #controls {
+  .action-dock > div:first-child {
+    min-width:0;
     display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    align-items:center;
-  }
-  button {
-    font-family:'Press Start 2P', monospace;
-    font-size:9px;
-    padding:10px 14px;
-    background:#1e1e1e;
-    color:#e8e8e8;
-    border:2px solid #d4af37;
-    border-radius:6px;
-    cursor:pointer;
-  }
-  button:hover:not(:disabled) { background:#2a2a2a; box-shadow:0 0 10px rgba(212,175,55,0.4); }
-  button:disabled { opacity:0.35; cursor:not-allowed; }
-  #bet-input {
-    font-family:'Press Start 2P', monospace;
-    font-size:9px;
-    padding:9px;
-    width:90px;
-    background:#0a0a0a;
-    color:#e8e8e8;
-    border:2px solid #d4af37;
-    border-radius:6px;
-    text-align:right;
+    flex-direction:column;
+    gap:5px;
   }
   #msg {
-    font-size:9px;
-    color:#ffcc66;
-    min-height:16px;
+    min-height:20px;
+    color:#ffe3a3;
+    font-size:clamp(12px, 1.1vw, 15px);
+    font-weight:800;
+    letter-spacing:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   #hand-rank {
-    font-size:11px;
-    font-weight:bold;
     min-height:18px;
-    text-shadow: 0 0 8px currentColor;
+    color:var(--muted);
+    font-family:'Cinzel', Georgia, serif;
+    font-size:clamp(14px, 1.25vw, 18px);
+    font-weight:800;
+    letter-spacing:0;
+    text-shadow:0 0 12px rgba(244,212,134,.22);
   }
-  #hand-rank.rank-0 { color:#aaa; }
-  #hand-rank.rank-1 { color:#7fff7f; }
-  #hand-rank.rank-2 { color:#7fff7f; }
-  #hand-rank.rank-3 { color:#7fff7f; }
-  #hand-rank.rank-4 { color:#66ccff; }
-  #hand-rank.rank-5 { color:#66ccff; }
-  #hand-rank.rank-6 { color:#cc88ff; }
-  #hand-rank.rank-7 { color:#ffaa44; }
-  #hand-rank.rank-8 { color:#ffd700; text-shadow: 0 0 12px #ffd700; animation: pulse-gold 0.8s infinite alternate; }
-  @keyframes pulse-gold { from { opacity:0.85; } to { opacity:1; } }
-  #slider-wrap { display:flex; align-items:center; gap:6px; }
-  input[type=range] { width:120px; accent-color:#d4af37; }
-  #btn-sfx { padding:10px 10px; min-width:44px; }
-  #btn-sfx.off { opacity:.45; }
-
-  /* winner banner */
+  #hand-rank.rank-0 { color:#b7b0a6; }
+  #hand-rank.rank-1, #hand-rank.rank-2, #hand-rank.rank-3 { color:#81e0ab; }
+  #hand-rank.rank-4, #hand-rank.rank-5 { color:#8fd6ff; }
+  #hand-rank.rank-6 { color:#d8b2ff; }
+  #hand-rank.rank-7 { color:#ffbf73; }
+  #hand-rank.rank-8 { color:var(--gold-bright); text-shadow:0 0 18px rgba(244,212,134,.8); animation:pulse-gold .9s infinite alternate; }
+  @keyframes pulse-gold { from { opacity:.86; } to { opacity:1; } }
+  #controls {
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    flex-wrap:nowrap;
+  }
+  button {
+    min-height:42px;
+    border:1px solid rgba(244,212,134,.65);
+    border-radius:8px;
+    padding:0 15px;
+    color:#fff6dd;
+    background:linear-gradient(180deg, #68402c, #25100c);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16), 0 8px 18px rgba(0,0,0,.35);
+    font-family:'Inter', system-ui, sans-serif;
+    font-size:13px;
+    font-weight:800;
+    letter-spacing:0;
+    cursor:pointer;
+    text-transform:uppercase;
+  }
+  button:hover:not(:disabled) { transform:translateY(-1px); border-color:var(--gold-bright); box-shadow:0 0 0 2px rgba(244,212,134,.14), 0 12px 22px rgba(0,0,0,.42); }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+  button:disabled { opacity:.42; cursor:not-allowed; transform:none; }
+  #btn-fold { background:linear-gradient(180deg, #7a2922, #2b0d0a); border-color:rgba(231,117,103,.72); }
+  #btn-check, #btn-call { background:linear-gradient(180deg, #285849, #0d241c); border-color:rgba(105,218,157,.58); }
+  #btn-bet { background:linear-gradient(180deg, #9b6a2f, #3a1d0d); border-color:rgba(255,208,112,.78); }
+  #btn-next { background:linear-gradient(180deg, #d5ad5e, #6b3f17); color:#180c05; border-color:#ffe4a3; }
+  #btn-sfx { min-width:44px; padding:0 10px; font-size:18px; }
+  #btn-sfx.off { opacity:.48; }
+  #slider-wrap {
+    height:46px;
+    display:grid;
+    grid-template-columns:auto minmax(110px, 150px) 76px;
+    align-items:center;
+    gap:8px;
+    padding:0 8px 0 0;
+    border:1px solid rgba(215,180,106,.2);
+    border-radius:10px;
+    background:rgba(0,0,0,.18);
+  }
+  input[type=range] {
+    width:100%;
+    min-width:96px;
+    accent-color:var(--gold-bright);
+  }
+  #bet-input {
+    height:32px;
+    width:76px;
+    border:1px solid rgba(215,180,106,.55);
+    border-radius:7px;
+    background:#0d0908;
+    color:#ffe8b0;
+    font-family:'Inter', system-ui, sans-serif;
+    font-size:14px;
+    font-weight:800;
+    text-align:right;
+    padding:0 8px;
+  }
+  .table-stats {
+    min-height:34px;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:18px;
+    padding:7px 12px;
+    border-radius:12px;
+    color:var(--muted);
+    font-size:12px;
+    font-weight:700;
+  }
+  .table-stats span span, .table-stats > span { color:#ffe0a0; }
   #winner-banner {
     position:absolute;
-    left:50%; top:44%;
-    transform:translate(-50%,-50%);
-    background:rgba(10,10,10,0.92);
-    border:3px solid #d4af37;
-    border-radius:12px;
-    padding:18px 28px;
-    text-align:center;
-    font-size:12px;
-    color:#fffacd;
-    box-shadow:0 0 30px rgba(212,175,55,0.5);
+    right:18px;
+    bottom:18px;
+    max-width:min(360px, calc(100% - 36px));
     display:none;
     pointer-events:none;
     z-index:5;
-    line-height:1.9;
+    padding:10px 14px;
+    border:1px solid rgba(244,212,134,.8);
+    border-radius:10px;
+    background:rgba(18,11,8,.9);
+    color:#fff1c4;
+    box-shadow:0 14px 30px rgba(0,0,0,.48), 0 0 22px rgba(215,180,106,.24);
+    font-family:'Inter', system-ui, sans-serif;
+    font-size:13px;
+    font-weight:800;
+    line-height:1.35;
+    text-align:left;
   }
-  #winner-banner small { font-size:8px; color:#7fff7f; display:block; margin-top:4px;}
+  #winner-banner small { display:block; margin-top:2px; color:#8ee6b2; font-size:11px; font-weight:700; }
+  @media (max-width: 900px) {
+    #game-wrap { height:calc(100dvh - 12px); width:calc(100vw - 12px); gap:6px; }
+    canvas { width:min(100%, calc((100dvh - 214px) * 1.685714)); max-height:calc(100dvh - 214px); }
+    .action-dock { grid-template-columns:1fr; padding:8px; gap:8px; }
+    #controls { justify-content:center; flex-wrap:wrap; }
+    button { min-height:38px; padding:0 11px; font-size:12px; }
+    #slider-wrap { grid-template-columns:auto minmax(120px, 1fr) 72px; width:100%; }
+    .table-stats { flex-wrap:wrap; gap:8px 14px; font-size:11px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
 </style>
 </head>
 <body>
 <div id="game-wrap">
   <div id="canvas-holder">
-    <canvas id="table" width="960" height="540"></canvas>
+    <canvas id="table" width="1180" height="700"></canvas>
     <div id="winner-banner"></div>
   </div>
-  <div id="ui-bar">
+  <div id="ui-bar" class="action-dock">
     <div>
       <div id="msg">Welcome to Texas Hold'em</div>
       <div id="hand-rank"></div>
@@ -143,7 +269,7 @@
       <button id="btn-sfx" title="Toggle sound">🔊</button>
     </div>
   </div>
-  <div id="ui-bar" style="font-size:8px; justify-content:center;">
+  <div id="stats-bar" class="table-stats">
     <span>Pot: $<span id="pot">0</span></span> &nbsp;|&nbsp;
     <span>You: $<span id="player-chips">1000</span></span> &nbsp;|&nbsp;
     <span>Small Blind: 5 / Big Blind: 10</span>
@@ -991,108 +1117,323 @@ function updateUI(){
 }
 
 // --- Rendering ---
+const CARD_W = 64;
+const CARD_H = 90;
+const CARD_GAP = 14;
+
 function getSeatCoords(){
-  const cx = canvas.width/2;
+  const w = canvas.width, h = canvas.height, cx = w/2;
   return [
-    {x:cx, y:470, p:0},
-    {x:140, y:240, p:1},
-    {x:cx, y:110, p:2},
-    {x:820, y:240, p:3},
+    {x:cx, y:h-128, p:0, align:'bottom'},
+    {x:150, y:h*0.52, p:1, align:'left'},
+    {x:cx, y:112, p:2, align:'top'},
+    {x:w-150, y:h*0.52, p:3, align:'right'},
   ];
 }
 
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  // felt
-  ctx.fillStyle = '#114d1f';
-  roundRect(ctx, 40, 60, canvas.width-80, 380, 200);
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  drawRoom(w,h);
+  drawTable(w,h);
+  drawCenterBoard(w,h);
+
+  const seats = getSeatCoords().map(s => ({...s, faceUp: s.p===0 || stage==='showdown'}));
+  const winningRefs = winningCardRefs();
+  for(const seat of seats) drawSeat(seat, winningRefs);
+}
+
+function drawRoom(w,h){
+  ctx.fillStyle = '#100b0a';
+  roundRect(ctx, 0, 0, w, h, 14);
   ctx.fill();
-  ctx.strokeStyle = '#d4af37';
+  ctx.fillStyle = 'rgba(215,180,106,0.06)';
+  for(let x=70; x<w; x+=115){
+    roundRect(ctx, x, 0, 1, h, 0);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(91,44,31,0.42)';
+  roundRect(ctx, 0, h*0.72, w, h*0.28, 0);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.42)';
+  roundRect(ctx, 66, h-88, w-132, 52, 32);
+  ctx.fill();
+}
+
+function drawTable(w,h){
+  const x = 40, y = 42, tw = w-80, th = h-112;
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.78)';
+  ctx.shadowBlur = 32;
+  ctx.fillStyle = '#170b08';
+  roundRect(ctx, x, y, tw, th, th/2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#3a1710';
+  roundRect(ctx, x+8, y+8, tw-16, th-16, th/2);
+  ctx.fill();
+  ctx.strokeStyle = '#e0bd72';
+  ctx.lineWidth = 8;
+  ctx.stroke();
+
+  ctx.fillStyle = '#734428';
+  roundRect(ctx, x+24, y+24, tw-48, th-48, th/2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,235,177,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#075236';
+  roundRect(ctx, x+54, y+54, tw-108, th-108, th/2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(244,212,134,0.46)';
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  // community cards center
-  const cx = canvas.width/2, cy = 240;
-  for(let i=0;i<5;i++){
-    drawCard(cx-160+i*66, cy-45, community[i] || null, community[i]!==undefined);
+  ctx.fillStyle = 'rgba(255,255,255,0.035)';
+  for(let i=0;i<9;i++){
+    roundRect(ctx, x+110+i*104, y+82, 1, th-164, 0);
+    ctx.fill();
   }
-  ctx.fillStyle = '#ffcc66';
-  ctx.font = 'bold 14px "Press Start 2P"';
+  ctx.fillStyle = 'rgba(0,0,0,0.15)';
+  roundRect(ctx, w/2-240, h/2-98, 480, 196, 98);
+  ctx.fill();
+}
+
+function drawCenterBoard(w,h){
+  const cx = w/2, cy = h/2-8;
+  const total = CARD_W*5 + CARD_GAP*4;
+  const startX = cx - total/2;
+  const winners = Array.isArray(showdownWinners) ? showdownWinners.map(n=>+n) : [];
+  const refs = winningCardRefs();
+
+  ctx.fillStyle = 'rgba(8,33,24,0.74)';
+  roundRect(ctx, startX-26, cy-CARD_H/2-20, total+52, CARD_H+88, 26);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(215,180,106,0.34)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  for(let i=0;i<5;i++){
+    const c = community[i] || null;
+    const highlight = stage==='showdown' && winners.length && c && refs.has(c);
+    drawCard(startX+i*(CARD_W+CARD_GAP), cy-CARD_H/2, c, community[i]!==undefined, {highlight});
+  }
+  drawPotPanel(cx, cy+82);
+}
+
+function drawPotPanel(cx, y){
+  ctx.fillStyle = 'rgba(17,9,7,0.82)';
+  roundRect(ctx, cx-150, y-20, 300, 42, 17);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(244,212,134,0.45)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#ffe0a0';
+  ctx.font = '800 20px Inter, Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('POT $'+pot, cx, cy+70);
+  ctx.fillText('Pot $'+pot, cx, y+7);
 
-  const seats = getSeatCoords().map(s => ({...s, faceUp: s.p===0 || stage==='showdown'}));
-
-  for(const seat of seats){
-    const pl = players[seat.p];
-    if(!pl) continue;
-    const isActing = actingIdx===seat.p && stage!=='showdown' && stage!=='waiting';
-    const isWinner = Array.isArray(showdownWinners) && showdownWinners.map(n=>+n).includes(+seat.p);
-
-    // winner glow
-    if(isWinner){
-      ctx.save();
-      ctx.shadowColor = '#ffd700';
-      ctx.shadowBlur = 25;
-      ctx.fillStyle = '#ffd700';
-      ctx.font = '10px "Press Start 2P"';
-      ctx.textAlign = 'center';
-      ctx.fillText('★ WINNER ★', seat.x, seat.y - 98);
-      ctx.restore();
-    }
-
-    // --- turn timer ring over head ---
-    if(isActing){
-      const frac = Math.max(0, turnTimeLeft / TURN_SECONDS);
-      const secs = Math.ceil(turnTimeLeft);
-      const tx = seat.x, ty = seat.y - 78;
-      ctx.save();
-      // background ring
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath();
-      ctx.arc(tx, ty, 18, 0, Math.PI*2);
-      ctx.stroke();
-      // progress ring
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = frac < 0.33 ? '#ff4444' : frac < 0.6 ? '#ffcc66' : '#7fff7f';
-      ctx.beginPath();
-      ctx.arc(tx, ty, 18, -Math.PI/2, -Math.PI/2 + frac * Math.PI*2);
-      ctx.stroke();
-      ctx.restore();
-      // seconds
-      ctx.fillStyle = frac < 0.33 ? '#ff6666' : '#fffacd';
-      ctx.font = '10px "Press Start 2P"';
-      ctx.textAlign = 'center';
-      ctx.fillText(String(secs), tx, ty + 4);
-    }
-
-    ctx.fillStyle = isWinner ? '#ffd700' : isActing ? '#fffacd' : '#e8e8e8';
-    ctx.font = '10px "Press Start 2P"';
-    ctx.textAlign = 'center';
-    ctx.fillText(pl.name + (folded[seat.p]?'  (FOLD)':''), seat.x, seat.y-55);
-    ctx.font = '9px "Press Start 2P"';
-    ctx.fillStyle = '#ffcc66';
-    ctx.fillText('$'+pl.chips, seat.x, seat.y-40);
-    if(roundBets[seat.p]>0){
-      ctx.fillStyle = '#7fff7f';
-      ctx.fillText('Bet '+roundBets[seat.p], seat.x, seat.y-25);
-    }
-    // hole cards
-    drawCard(seat.x-35, seat.y-10, pl.hand[0], seat.faceUp);
-    drawCard(seat.x+5, seat.y-10, pl.hand[1], seat.faceUp);
-
-    // show hand name at showdown
-    if(stage==='showdown' && !folded[seat.p]){
-      const ev = bestHand(pl.hand, community);
-      ctx.fillStyle = isWinner ? '#ffd700' : '#aaa';
-      ctx.font = '7px "Press Start 2P"';
-      ctx.fillText(ev.name, seat.x, seat.y + 82);
-    }
+  if(stage==='showdown' && lastPots && lastPots.length>1){
+    ctx.fillStyle = 'rgba(255,232,176,0.78)';
+    ctx.font = '700 12px Inter, Arial';
+    const lines = lastPots.slice(0,3).map((p,i)=>(i===0?'Main':'Side') + ' $' + p.amount);
+    ctx.fillText(lines.join('   '), cx, y+30);
   }
 }
 
+function drawSeat(seat, winningRefs){
+  const pl = players[seat.p];
+  if(!pl) return;
+  const isActing = actingIdx===seat.p && stage!=='showdown' && stage!=='waiting';
+  const isWinner = Array.isArray(showdownWinners) && showdownWinners.map(n=>+n).includes(+seat.p);
+  const isFolded = !!folded[seat.p];
+  const inactiveShowdown = stage==='showdown' && !isWinner;
+  const panelW = seat.p===0 ? 260 : 222;
+  const panelH = seat.p===0 ? 118 : 100;
+  const panelX = seat.x - panelW/2;
+  const panelY = seat.y - panelH/2;
+
+  ctx.save();
+  ctx.globalAlpha = isFolded || inactiveShowdown ? 0.58 : 1;
+  if(isActing || isWinner){
+    ctx.shadowColor = isWinner ? '#f4d486' : '#78e6ae';
+    ctx.shadowBlur = isWinner ? 28 : 22;
+  }
+  ctx.fillStyle = isWinner ? '#4c2d14' : '#211310';
+  roundRect(ctx, panelX, panelY, panelW, panelH, 18);
+  ctx.fill();
+  ctx.strokeStyle = isWinner ? '#f4d486' : isActing ? '#78e6ae' : 'rgba(215,180,106,0.42)';
+  ctx.lineWidth = isWinner || isActing ? 3 : 1.5;
+  ctx.stroke();
+  ctx.restore();
+
+  drawAvatar(seat, pl, isActing, isWinner, isFolded);
+  drawSeatText(seat, pl, isWinner, isFolded);
+  drawSeatBadges(seat);
+  drawChipStack(seat.x + panelW/2 - 42, seat.y + panelH/2 - 28, pl.chips, isFolded || inactiveShowdown);
+
+  if(roundBets[seat.p]>0) drawBetTag(seat, roundBets[seat.p]);
+
+  const cardsY = seat.p===0 ? seat.y-10 : seat.y+8;
+  const cardsX = seat.x - CARD_W - 5;
+  drawCard(cardsX, cardsY, pl.hand[0], seat.faceUp, {highlight:isWinner && winningRefs.has(pl.hand[0]), dim:inactiveShowdown && !winningRefs.has(pl.hand[0])});
+  drawCard(cardsX + CARD_W + 10, cardsY, pl.hand[1], seat.faceUp, {highlight:isWinner && winningRefs.has(pl.hand[1]), dim:inactiveShowdown && !winningRefs.has(pl.hand[1])});
+
+  if(isActing) drawTimer(seat);
+  if(stage==='showdown' && !isFolded) drawShowdownLabel(seat, pl, isWinner);
+}
+
+function drawAvatar(seat, pl, isActing, isWinner, isFolded){
+  const ax = seat.x - (seat.p===0 ? 104 : 86);
+  const ay = seat.y - (seat.p===0 ? 26 : 24);
+  ctx.save();
+  ctx.globalAlpha = isFolded ? .55 : 1;
+  ctx.fillStyle = isWinner ? '#f4d486' : isActing ? '#75dca5' : '#d7b46a';
+  ctx.beginPath();
+  ctx.arc(ax, ay, 26, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = seat.p===0 ? '#103f32' : ['#41233a','#233b55','#533322'][Math.max(0,seat.p-1)] || '#2a2a2a';
+  ctx.beginPath();
+  ctx.arc(ax, ay, 21, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#fff4d2';
+  ctx.font = '800 13px Inter, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(seat.p===0 ? 'YOU' : 'B'+seat.p, ax, ay+5);
+  ctx.restore();
+}
+
+function drawSeatText(seat, pl, isWinner, isFolded){
+  ctx.textAlign = 'left';
+  const tx = seat.x - (seat.p===0 ? 66 : 48);
+  const ty = seat.y - (seat.p===0 ? 33 : 30);
+  ctx.fillStyle = isWinner ? '#ffe8a8' : '#f7ecd8';
+  ctx.font = '800 15px Inter, Arial';
+  ctx.fillText(pl.name + (isFolded ? '  FOLD' : ''), tx, ty);
+  ctx.fillStyle = '#d7b46a';
+  ctx.font = '800 14px Inter, Arial';
+  ctx.fillText('$'+pl.chips, tx, ty+21);
+}
+
+function drawSeatBadges(seat){
+  const blinds = stage!=='waiting' && liveSeats().length>=2 ? preflopBlindSeats() : null;
+  const badges = [];
+  if(seat.p === dealerIdx) badges.push('D');
+  if(blinds && seat.p === blinds.sb) badges.push('SB');
+  if(blinds && seat.p === blinds.bb) badges.push('BB');
+  for(let i=0;i<badges.length;i++){
+    const bx = seat.x - 22 + i*30;
+    const by = seat.y - (seat.p===0 ? 76 : 62);
+    ctx.fillStyle = badges[i]==='D' ? '#f4d486' : '#e9eef5';
+    ctx.beginPath();
+    ctx.arc(bx, by, 14, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#4b2a13';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#251006';
+    ctx.font = '800 10px Inter, Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(badges[i], bx, by+4);
+  }
+}
+
+function drawChipStack(x,y,chips,dim){
+  const stacks = Math.max(0, Math.min(5, Math.ceil((chips||0)/250)));
+  if(stacks===0) return;
+  ctx.save();
+  ctx.globalAlpha = dim ? .48 : 1;
+  for(let i=0;i<stacks;i++){
+    ctx.fillStyle = ['#c53a32','#214f9b','#f4d486','#198f58','#efefef'][i%5];
+    ctx.beginPath();
+    ctx.arc(x + i*8, y - i*3, 10, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#22110b';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawBetTag(seat, amt){
+  const towardCenterX = (canvas.width/2 - seat.x) * .24;
+  const towardCenterY = (canvas.height/2 - seat.y) * .34;
+  const x = seat.x + towardCenterX;
+  const y = seat.y + towardCenterY;
+  ctx.fillStyle = 'rgba(6,35,25,0.9)';
+  roundRect(ctx, x-42, y-16, 84, 30, 15);
+  ctx.fill();
+  ctx.strokeStyle = '#78e6ae';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#bdf8d4';
+  ctx.font = '800 13px Inter, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('$'+amt, x, y+5);
+}
+
+function drawTimer(seat){
+  const frac = Math.max(0, turnTimeLeft / TURN_SECONDS);
+  const secs = Math.ceil(turnTimeLeft);
+  const tx = seat.x + (seat.p===1 ? 72 : seat.p===3 ? -72 : 0);
+  const ty = seat.y - (seat.p===0 ? 80 : 68);
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.arc(tx, ty, 20, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = frac < 0.33 ? '#e75548' : frac < 0.6 ? '#f4d486' : '#78e6ae';
+  ctx.beginPath();
+  ctx.arc(tx, ty, 20, -Math.PI/2, -Math.PI/2 + frac * Math.PI*2);
+  ctx.stroke();
+  ctx.fillStyle = '#fff6dd';
+  ctx.font = '800 12px Inter, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(String(secs), tx, ty+4);
+}
+
+function drawShowdownLabel(seat, pl, isWinner){
+  const ev = bestHand(pl.hand, community);
+  const y = seat.y + (seat.p===0 ? 104 : 92);
+  ctx.fillStyle = isWinner ? '#f4d486' : 'rgba(205,196,178,0.72)';
+  ctx.font = '800 13px Inter, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(isWinner ? ev.name + ' wins' : ev.name, seat.x, y);
+}
+
+function winningCardRefs(){
+  const refs = new Set();
+  if(stage!=='showdown' || !Array.isArray(showdownWinners)) return refs;
+  for(const i of showdownWinners){
+    const pl = players[+i];
+    if(!pl || folded[+i]) continue;
+    for(const c of bestFiveCards(pl.hand, community)) refs.add(c);
+  }
+  return refs;
+}
+
+function bestFiveCards(hole, board){
+  const all = hole.concat(board);
+  const n = all.length;
+  if(n < 5) return all.slice();
+  let best = null;
+  let bestCards = [];
+  for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)for(let e=d+1;e<n;e++){
+    const combo = [all[a],all[b],all[c],all[d],all[e]];
+    const ev = evalHand(combo);
+    if(!best || ev.rank>best.rank || (ev.rank===best.rank && compareTie(ev.tie,best.tie)>0)){
+      best = ev;
+      bestCards = combo;
+    }
+  }
+  return bestCards;
+}
+
 function roundRect(ctx,x,y,w,h,r){
+  r = Math.max(0, Math.min(r, w/2, h/2));
   ctx.beginPath();
   ctx.moveTo(x+r,y);
   ctx.arcTo(x+w,y,x+w,y+h,r);
@@ -1102,33 +1443,39 @@ function roundRect(ctx,x,y,w,h,r){
   ctx.closePath();
 }
 
-function drawCard(x,y,card,faceUp){
+function drawCard(x,y,card,faceUp,opts={}){
   ctx.save();
+  ctx.globalAlpha = opts.dim ? .48 : 1;
   ctx.translate(x,y);
-  ctx.fillStyle = '#f7f7f7';
-  roundRect(ctx,0,0,56,78,6);
+  if(opts.highlight){
+    ctx.shadowColor = '#f4d486';
+    ctx.shadowBlur = 18;
+  }
+  ctx.fillStyle = faceUp && card ? '#fbf6ea' : card ? '#173c6f' : 'rgba(255,255,255,0.08)';
+  roundRect(ctx,0,0,CARD_W,CARD_H,9);
   ctx.fill();
-  ctx.strokeStyle = '#222';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = opts.highlight ? '#f4d486' : faceUp && card ? '#241712' : 'rgba(215,180,106,0.34)';
+  ctx.lineWidth = opts.highlight ? 3 : 1.8;
   ctx.stroke();
   if(card && faceUp){
     const red = card.s==='♥' || card.s==='♦';
-    ctx.fillStyle = red ? '#d22' : '#111';
-    ctx.font = card.r === '10' ? 'bold 15px Arial' : 'bold 18px Arial';
+    ctx.fillStyle = red ? '#bd2e2a' : '#141414';
+    ctx.font = card.r === '10' ? '800 18px Georgia, serif' : '800 22px Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText(card.r, 28, 28);
-    ctx.font = '20px Arial';
-    ctx.fillText(card.s, 28, 52);
+    ctx.fillText(card.r, CARD_W/2, 31);
+    ctx.font = '26px Georgia, serif';
+    ctx.fillText(card.s, CARD_W/2, 62);
   } else if(card){
-    // card back
-    ctx.fillStyle = '#1a3a6b';
-    roundRect(ctx,4,4,48,70,4);
+    ctx.fillStyle = '#0f2e58';
+    roundRect(ctx,7,7,CARD_W-14,CARD_H-14,7);
     ctx.fill();
-    ctx.fillStyle = '#d4af37';
-    ctx.font = 'bold 10px "Press Start 2P"';
+    ctx.strokeStyle = 'rgba(244,212,134,0.82)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#d7b46a';
+    ctx.font = '800 18px Cinzel, Georgia, serif';
     ctx.textAlign = 'center';
-    ctx.fillText('♠', 28, 36);
-    ctx.fillText('♣', 28, 52);
+    ctx.fillText('TH', CARD_W/2, 52);
   }
   ctx.restore();
 }
