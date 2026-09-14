@@ -81,7 +81,13 @@ function loadGame() {
   const cancelAnimationFrame = (id) => { rafs.delete(id); };
   const setTimeoutFn = (fn) => { const id = { fn }; timers.push(id); return id; };
   const clearTimeoutFn = (id) => { const i = timers.indexOf(id); if (i >= 0) timers.splice(i, 1); };
-  const speechSynthesis = { getVoices() { return []; }, cancel() {}, speak() {}, onvoiceschanged: null };
+  const spoken = [];
+  const speechSynthesis = {
+    getVoices() { return [{ name: 'Test English' }]; },
+    cancel() {},
+    speak(u) { spoken.push(u.text); },
+    onvoiceschanged: null,
+  };
   function SpeechSynthesisUtterance(t) { this.text = t; }
   const windowObj = {
     AudioContext: FakeAudioContext,
@@ -118,6 +124,7 @@ function loadGame() {
         postBlind, humanCanAct, handleTurnTimeout, nextActive, runOutBoard,
         buildPots, splitPotAmount, settlePots, preflopBlindSeats,
         minRaiseTo, playerCanRaise, liveSeats, nextLiveSeat, advanceButton,
+        SFX, VOICE, formatWinnerAnnouncement, showWinnerBanner,
       };
     `
   );
@@ -130,6 +137,7 @@ function loadGame() {
   );
   api._timers = timers;
   api._els = els;
+  api._spoken = spoken;
   api.flushTimers = () => {
     const batch = timers.splice(0, timers.length);
     for (const t of batch) t.fn();
